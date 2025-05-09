@@ -2,3 +2,4 @@ ccxt
 pandas
 numpy
 Flask
+gunicorn
