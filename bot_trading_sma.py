@@ -69,7 +69,7 @@ def send_positions_telegram():
         send_telegram_message("Aucune position ouverte actuellement.")
 
 # Configuration du bot
-exchange = ccxt.bybit({'apiKey': os.getenv('API_KEY'), 'secret': os.getenv('API_SECRET')})
+exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
 symbols = ['DOGE/USDT', 'ADA/USDT']
 timeframe = '1m'
 
