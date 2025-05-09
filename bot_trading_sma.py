@@ -34,28 +34,30 @@ def place_order(symbol, side, amount):
         print(f"Placing {side} order for {amount} {symbol}")
         order = exchange.create_order(symbol, 'market', side, amount)
         return order
-    except Exception as e:
+            except Exception as e:
         print(f"Error placing order: {e}")
         return None
 
 # Boucle de trading
 while True:
     for symbol in symbols:
-    try:
-        data = get_ohlcv()
-        data = calculate_sma(data)
+        try:
+        try:
+                    data = get_ohlcv()()
+                    data = calculate_sma(data)
 
         # Signaux d'achat/vente
-        if data['SMA10'].iloc[-1] > data['SMA100'].iloc[-1]:
-            print("Signal d'achat détecté")
-            place_order(symbol, 'buy', 15 / len(symbols))
+                    if data['SMA10'].iloc[-1] > data['SMA100'].iloc[-1]:
+                            print("Signal d'achat détecté")
+                            place_order(symbol, 'buy', 15 / len(symbols))
 
-        elif data['SMA10'].iloc[-1] < data['SMA100'].iloc[-1]:
-            print("Signal de vente détecté")
-            place_order(symbol, 'sell', 15 / len(symbols))
+                    elif data['SMA10'].iloc[-1] < data['SMA100'].iloc[-1]:
+                            print("Signal de vente détecté")
+                            place_order(symbol, 'sell', 15 / len(symbols))
 
-        time.sleep(30)  # Attendre 1 minute avant la prochaine itération
+                    time.sleep(30)  # Attendre 1 minute avant la prochaine itération
     except Exception as e:
-        print(f"Erreur pendant la boucle de trading : {e}")
-        time.sleep(5)
+                    print(f"Erreur pendant la boucle de trading : {e}")
+                    time.sleep(5)
+
 
