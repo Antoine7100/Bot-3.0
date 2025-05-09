@@ -70,6 +70,8 @@ def send_positions_telegram():
 
 # Configuration du bot
 exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
+exchange.options['createMarketBuyOrderRequiresPrice'] = False
+
 symbols = ['DOGE/USDT', 'ADA/USDT']
 timeframe = '1m'
 
