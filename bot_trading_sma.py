@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import time
 from threading import Thread
-from flask import Flask
+from flask import Flask, jsonify
 import os
 import requests
 
@@ -14,6 +14,12 @@ app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
+# Variables globales pour le suivi
+trades = []
+gains_pertes = 0
+nb_trades = 0
+
+# Fonction pour envoyer un message Telegram
 def send_telegram_message(message):
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -22,16 +28,20 @@ def send_telegram_message(message):
             'text': message
         }
         requests.post(url, data=payload)
-        print(f"Message Telegram envoyé : {message}")
     except Exception as e:
         print(f"Erreur lors de l'envoi du message Telegram : {e}")
 
-# Route par défaut pour le service Web
+# Route par défaut
 @app.route('/')
 def home():
     return 'Bot de Trading SMA 10/100 - En cours de fonctionnement!'
 
-# Configuration
+# Route pour afficher les positions ouvertes
+@app.route('/positions')
+def positions():
+    return jsonify(trades)
+
+# Configuration du bot
 exchange = ccxt.bybit({
     'apiKey': os.getenv('API_KEY'),
     'secret': os.getenv('API_SECRET')
@@ -43,19 +53,18 @@ timeframe = '1m'
 short_window = 10
 long_window = 100
 leverage = 5
+risk_percentage = 0.01  # Risque de 1% du capital
 
-# Paramètres de la stratégie en grille
-grid_spacing = 0.005
-num_grids = 5
+# Gestion des risques dynamiques
+def calculate_position_size(balance):
+    return max(balance * risk_percentage, 1)
 
-# Gestion des risques
-stop_loss_multiplier = 2
-
-# Calcul des moyennes mobiles
-def calculate_sma(data):
-    data['SMA10'] = data['close'].rolling(window=short_window).mean()
-    data['SMA100'] = data['close'].rolling(window=long_window).mean()
-    return data
+# Fonction de calcul du Stop Loss et Take Profit dynamiques
+def calculate_atr(data, period=14):
+    data['TR'] = np.maximum(data['high'] - data['low'],
+                            np.maximum(abs(data['high'] - data['close'].shift()), abs(data['low'] - data['close'].shift())))
+    data['ATR'] = data['TR'].rolling(window=period).mean()
+    return data['ATR'].iloc[-1]
 
 # Fonction pour récupérer les données OHLC
 def get_ohlcv(symbol):
@@ -63,21 +72,21 @@ def get_ohlcv(symbol):
         bars = exchange.fetch_ohlcv(symbol, timeframe)
         df = pd.DataFrame(bars, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        return calculate_sma(df)
+        return df
     except Exception as e:
-        print(f"Erreur lors de la récupération des données : {e}")
         send_telegram_message(f"Erreur lors de la récupération des données : {e}")
         return None
 
 # Fonction de prise de position
 def place_order(symbol, side, amount):
     try:
-        print(f"Placing {side} order for {amount} {symbol}")
         order = exchange.create_order(symbol, 'market', side, amount)
+        trades.append({'symbol': symbol, 'side': side, 'amount': amount})
+        global nb_trades
+        nb_trades += 1
         send_telegram_message(f"Ordre {side} placé pour {amount} {symbol}")
         return order
     except Exception as e:
-        print(f"Error placing order: {e}")
         send_telegram_message(f"Erreur lors de la prise d'ordre : {e}")
         return None
 
@@ -90,23 +99,29 @@ def run_bot():
                 if data is None:
                     continue
 
-                last_price = data['close'].iloc[-1]
-                sma10 = data['SMA10'].iloc[-1]
-                sma100 = data['SMA100'].iloc[-1]
+                atr = calculate_atr(data)
+                balance = exchange.fetch_balance()['total']['USDT']
+                amount = calculate_position_size(balance)
 
-                # Vérification des signaux d'achat/vente
-                if sma10 > sma100:
-                    print(f"Signal d'achat détecté pour {symbol}")
-                    send_telegram_message(f"Signal d'achat détecté pour {symbol}")
-                    place_order(symbol, 'buy', 15 / len(symbols))
-                elif sma10 < sma100:
-                    print(f"Signal de vente détecté pour {symbol}")
-                    send_telegram_message(f"Signal de vente détecté pour {symbol}")
-                    place_order(symbol, 'sell', 15 / len(symbols))
+                sma10 = data['close'].rolling(window=10).mean().iloc[-1]
+                sma100 = data['close'].rolling(window=100).mean().iloc[-1]
 
+                previous_sma10 = data['close'].rolling(window=10).mean().iloc[-2]
+                previous_sma100 = data['close'].rolling(window=100).mean().iloc[-2]
+
+                # Vérification des signaux d'achat/vente avec croisement
+                if sma10 > sma100 and previous_sma10 <= previous_sma100:
+                    print(f"Croisement haussier détecté pour {symbol}")
+                    send_telegram_message(f"Croisement haussier détecté pour {symbol}")
+                    place_order(symbol, 'buy', amount)
+                elif sma10 < sma100 and previous_sma10 >= previous_sma100:
+                    print(f"Croisement baissier détecté pour {symbol}")
+                    send_telegram_message(f"Croisement baissier détecté pour {symbol}")
+                    place_order(symbol, 'sell', amount)
+
+                send_telegram_message(f"Trade exécuté pour {symbol}. PnL: {gains_pertes} USDT.")
                 time.sleep(30)
             except Exception as e:
-                print(f"Erreur pendant la boucle de trading : {e}")
                 send_telegram_message(f"Erreur pendant la boucle de trading : {e}")
                 time.sleep(5)
 
@@ -117,6 +132,4 @@ bot_thread.start()
 # Démarrer le serveur Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
-
-
 
