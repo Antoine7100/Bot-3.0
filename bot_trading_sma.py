@@ -35,7 +35,7 @@ def send_telegram_message(message):
 
 # Fonction pour envoyer un résumé quotidien
 def send_daily_summary():
-    summary = f"Résumé quotidien des trades:
+    summary = f"Résumé quotidien des trades:\nNombre de trades: {nb_trades}\nGains/Pertes: {gains_pertes} USDT"
 Nombre de trades: {nb_trades}
 Gains/Pertes: {gains_pertes} USDT"
     send_telegram_message(summary)
@@ -69,9 +69,15 @@ def positions():
 # Fonction pour envoyer les positions via Telegram
 def send_positions_telegram():
     if positions:
-        message = "Positions ouvertes sur Bybit :\n"
+        message = "Positions ouvertes sur Bybit :
+"
         for pos in positions:
-            message += (f"Symbole: {pos['symbol']}\nType: {pos['side']}\nQuantité: {pos['amount']}\nPrix: {pos['price']} USDT\n\n")
+            message += (f"Symbole: {pos['symbol']}
+Type: {pos['side']}
+Quantité: {pos['amount']}
+Prix: {pos['price']} USDT
+
+")
         send_telegram_message(message)
     else:
         send_telegram_message("Aucune position ouverte actuellement.")
@@ -128,8 +134,12 @@ def place_order(symbol, side, amount):
         # Calcul du PnL estimé (simplifié)
         pnl = amount * price * (1 if side == 'buy' else -1)
         gains_pertes += pnl
-        message = (f"Ordre {side.upper()} exécuté pour {symbol}\n"
-                   f"Montant: {amount}\nPrix: {price}\nPnL estimé: {pnl} USDT\n"
+        message = (f"Ordre {side.upper()} exécuté pour {symbol}
+"
+                   f"Montant: {amount}
+Prix: {price}
+PnL estimé: {pnl} USDT
+"
                    f"Total PnL: {gains_pertes} USDT")
         send_telegram_message(message)
         return order
@@ -219,4 +229,3 @@ bot_thread.start()
 # Démarrer le serveur Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
-
