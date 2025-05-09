@@ -15,6 +15,7 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 # Variables globales pour le suivi
+positions = []
 trades = []
 gains_pertes = 0
 nb_trades = 0
@@ -34,7 +35,9 @@ def send_telegram_message(message):
 
 # Fonction pour envoyer un résumé quotidien
 def send_daily_summary():
-    summary = f"Résumé quotidien des trades:\nNombre de trades: {nb_trades}\nGains/Pertes: {gains_pertes} USDT"
+    summary = f"Résumé quotidien des trades:
+Nombre de trades: {nb_trades}
+Gains/Pertes: {gains_pertes} USDT"
     send_telegram_message(summary)
 
 # Planification du résumé quotidien toutes les 24 heures
@@ -59,6 +62,19 @@ def home():
     return 'Bot de Trading SMA 10/100 - En cours de fonctionnement!'
 
 # Route pour afficher les positions ouvertes
+@app.route('/positions')
+def positions():
+    return jsonify(positions)
+
+# Fonction pour envoyer les positions via Telegram
+def send_positions_telegram():
+    if positions:
+        message = "Positions ouvertes sur Bybit :\n"
+        for pos in positions:
+            message += (f"Symbole: {pos['symbol']}\nType: {pos['side']}\nQuantité: {pos['amount']}\nPrix: {pos['price']} USDT\n\n")
+        send_telegram_message(message)
+    else:
+        send_telegram_message("Aucune position ouverte actuellement.")
 @app.route('/positions')
 def positions():
     return jsonify(trades)
@@ -106,13 +122,36 @@ def place_order(symbol, side, amount):
         order = exchange.create_order(symbol, 'market', side, amount)
         price = order['price'] if 'price' in order else 'N/A'
         trades.append({'symbol': symbol, 'side': side, 'amount': amount, 'price': price})
+        positions.append({'symbol': symbol, 'side': side, 'amount': amount, 'price': price})
+        global nb_trades, gains_pertes
+        nb_trades += 1
+        # Calcul du PnL estimé (simplifié)
+        pnl = amount * price * (1 if side == 'buy' else -1)
+        gains_pertes += pnl
+        message = (f"Ordre {side.upper()} exécuté pour {symbol}\n"
+                   f"Montant: {amount}\nPrix: {price}\nPnL estimé: {pnl} USDT\n"
+                   f"Total PnL: {gains_pertes} USDT")
+        send_telegram_message(message)
+        return order
+    except Exception as e:
+        send_telegram_message(f"Erreur lors de la prise d'ordre : {e}")
+        return None(symbol, side, amount):
+    try:
+        print(f"Placing {side} order for {amount} {symbol}")
+        order = exchange.create_order(symbol, 'market', side, amount)
+        price = order['price'] if 'price' in order else 'N/A'
+        trades.append({'symbol': symbol, 'side': side, 'amount': amount, 'price': price})
         global nb_trades, gains_pertes
         nb_trades += 1
         # Calcul du PnL estimé (simplifié pour démonstration)
         pnl = amount * price * (1 if side == 'buy' else -1)
         gains_pertes += pnl
-        message = (f"Ordre {side.upper()} exécuté pour {symbol}\n"
-                   f"Montant: {amount}\nPrix: {price}\nPnL estimé: {pnl} USDT\n"
+        message = (f"Ordre {side.upper()} exécuté pour {symbol}
+"
+                   f"Montant: {amount}
+Prix: {price}
+PnL estimé: {pnl} USDT
+"
                    f"Total PnL: {gains_pertes} USDT")
         send_telegram_message(message)
         return order
@@ -180,3 +219,4 @@ bot_thread.start()
 # Démarrer le serveur Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
+
