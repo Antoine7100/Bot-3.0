@@ -28,6 +28,28 @@ def send_telegram_message(message):
             'text': message
         }
         requests.post(url, data=payload)
+        print(f"Message Telegram envoyé : {message}")
+    except Exception as e:
+        print(f"Erreur lors de l'envoi du message Telegram : {e}")
+
+# Fonction pour envoyer un résumé quotidien
+def send_daily_summary():
+    summary = f"Résumé quotidien des trades:\nNombre de trades: {nb_trades}\nGains/Pertes: {gains_pertes} USDT"
+    send_telegram_message(summary)
+
+# Planification du résumé quotidien toutes les 24 heures
+def schedule_daily_summary():
+    while True:
+        time.sleep(86400)  # 24 heures
+        send_daily_summary()
+(message):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {
+            'chat_id': TELEGRAM_CHAT_ID,
+            'text': message
+        }
+        requests.post(url, data=payload)
     except Exception as e:
         print(f"Erreur lors de l'envoi du message Telegram : {e}")
 
@@ -80,6 +102,25 @@ def get_ohlcv(symbol):
 # Fonction de prise de position
 def place_order(symbol, side, amount):
     try:
+        print(f"Placing {side} order for {amount} {symbol}")
+        order = exchange.create_order(symbol, 'market', side, amount)
+        price = order['price'] if 'price' in order else 'N/A'
+        trades.append({'symbol': symbol, 'side': side, 'amount': amount, 'price': price})
+        global nb_trades, gains_pertes
+        nb_trades += 1
+        # Calcul du PnL estimé (simplifié pour démonstration)
+        pnl = amount * price * (1 if side == 'buy' else -1)
+        gains_pertes += pnl
+        message = (f"Ordre {side.upper()} exécuté pour {symbol}\n"
+                   f"Montant: {amount}\nPrix: {price}\nPnL estimé: {pnl} USDT\n"
+                   f"Total PnL: {gains_pertes} USDT")
+        send_telegram_message(message)
+        return order
+    except Exception as e:
+        send_telegram_message(f"Erreur lors de la prise d'ordre : {e}")
+        return None
+(symbol, side, amount):
+    try:
         order = exchange.create_order(symbol, 'market', side, amount)
         trades.append({'symbol': symbol, 'side': side, 'amount': amount})
         global nb_trades
@@ -129,7 +170,13 @@ def run_bot():
 bot_thread = Thread(target=run_bot)
 bot_thread.start()
 
+# Lancer le résumé quotidien dans un thread
+summary_thread = Thread(target=schedule_daily_summary)
+summary_thread.start()
+
+bot_thread = Thread(target=run_bot)
+bot_thread.start()
+
 # Démarrer le serveur Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
-
