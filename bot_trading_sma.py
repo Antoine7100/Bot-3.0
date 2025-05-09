@@ -2,9 +2,19 @@ import ccxt
 import pandas as pd
 import numpy as np
 import time
+from threading import Thread
+from flask import Flask
+import os
+
+# Configuration du serveur Flask
+app = Flask(__name__)
+
+# Route par défaut pour le service Web
+@app.route('/')
+def home():
+    return 'Bot de Trading SMA 10/100 - En cours de fonctionnement!'
 
 # Configuration
-import os
 exchange = ccxt.bybit({
     'apiKey': os.getenv('API_KEY'),
     'secret': os.getenv('API_SECRET')
@@ -22,8 +32,7 @@ grid_spacing = 0.005  # Espace entre les ordres de grille
 num_grids = 5  # Nombre de niveaux de grille
 
 # Gestion des risques
-stop_loss_multiplier = 2  # Basé sur l'ATR
-take_profit_multiplier = 1.5
+stop_loss_multiplier = 2
 
 # Indicateurs techniques
 def calculate_rsi(data, period=14):
@@ -34,6 +43,7 @@ def calculate_rsi(data, period=14):
     rsi = 100 - (100 / (1 + rs))
     data['RSI'] = rsi
     return data
+
 
 def calculate_bollinger_bands(data, period=20, std_dev=2):
     data['SMA20'] = data['close'].rolling(window=period).mean()
@@ -62,36 +72,44 @@ def place_order(symbol, side, amount):
         print(f"Error placing order: {e}")
         return None
 
-# Boucle de trading
-while True:
-    for symbol in symbols:
-        try:
-            data = get_ohlcv(symbol)
-            if data is None:
-                continue
-            data = calculate_rsi(data)
-            data = calculate_bollinger_bands(data)
+# Fonction de trading en arrière-plan
+def run_bot():
+    while True:
+        for symbol in symbols:
+            try:
+                data = get_ohlcv(symbol)
+                if data is None:
+                    continue
+                data = calculate_rsi(data)
+                data = calculate_bollinger_bands(data)
 
-            # Grille de trading
-            last_price = data['close'].iloc[-1]
-            for i in range(-num_grids, num_grids + 1):
-                grid_price = last_price * (1 + i * grid_spacing)
-                side = 'buy' if i < 0 else 'sell'
-                print(f"Placing grid order at {grid_price} for {symbol}")
-                place_order(symbol, side, 15 / len(symbols))
+                last_price = data['close'].iloc[-1]
+                for i in range(-num_grids, num_grids + 1):
+                    grid_price = last_price * (1 + i * grid_spacing)
+                    side = 'buy' if i < 0 else 'sell'
+                    print(f"Placing grid order at {grid_price} for {symbol}")
+                    balance = exchange.fetch_balance()[symbol.split('/')[0]]['free']
+                    order_amount = min(balance * 0.9, 15 / len(symbols))
+                    place_order(symbol, side, order_amount)
 
-            # Signaux d'achat/vente avec RSI et Bollinger
-            if data['RSI'].iloc[-1] < 30 and last_price < data['BB_Lower'].iloc[-1]:
-                print(f"Signal d'achat détecté pour {symbol} (RSI et Bollinger)")
-                place_order(symbol, 'buy', 15 / len(symbols))
-            elif data['RSI'].iloc[-1] > 70 and last_price > data['BB_Upper'].iloc[-1]:
-                print(f"Signal de vente détecté pour {symbol} (RSI et Bollinger)")
-                place_order(symbol, 'sell', 15 / len(symbols))
+                if data['RSI'].iloc[-1] < 30 and last_price < data['BB_Lower'].iloc[-1]:
+                    print(f"Signal d'achat détecté pour {symbol}")
+                    place_order(symbol, 'buy', 15 / len(symbols))
+                elif data['RSI'].iloc[-1] > 70 and last_price > data['BB_Upper'].iloc[-1]:
+                    print(f"Signal de vente détecté pour {symbol}")
+                    place_order(symbol, 'sell', 15 / len(symbols))
 
-            time.sleep(30)  # Attendre 30 secondes avant la prochaine itération
-        except Exception as e:
-            print(f"Erreur pendant la boucle de trading : {e}")
-            time.sleep(5)
+                time.sleep(30)
+            except Exception as e:
+                print(f"Erreur pendant la boucle de trading : {e}")
+                time.sleep(5)
 
+# Lancer le bot dans un thread
+bot_thread = Thread(target=run_bot)
+bot_thread.start()
+
+# Démarrer le serveur Flask
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
 
 
