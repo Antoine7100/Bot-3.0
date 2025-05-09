@@ -49,7 +49,14 @@ def home():
 # Route pour afficher les positions ouvertes
 @app.route('/positions')
 def positions():
-    return jsonify(positions)
+    try:
+        if positions:
+            return jsonify(positions), 200
+        else:
+            return jsonify({"message": "Aucune position ouverte actuellement."}), 200
+    except Exception as e:
+        return jsonify({"error": f"Erreur lors de l'affichage des positions : {str(e)}"}), 500
+
 
 # Fonction pour envoyer les positions via Telegram
 def send_positions_telegram():
