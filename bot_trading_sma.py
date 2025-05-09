@@ -1,9 +1,14 @@
 import ccxt
 import pandas as pd
+import numpy as np
 import time
 
 # Configuration
-exchange = ccxt.bybit({'apiKey': 'YOUR_API_KEY', 'secret': 'YOUR_API_SECRET'})
+import os
+exchange = ccxt.bybit({
+    'apiKey': os.getenv('API_KEY'),
+    'secret': os.getenv('API_SECRET')
+})
 symbols = ['DOGE/USDT', 'ADA/USDT']
 timeframe = '1m'
 
@@ -12,8 +17,29 @@ short_window = 10
 long_window = 100
 leverage = 5
 
+# Paramètres de la stratégie en grille
+grid_spacing = 0.005  # Espace entre les ordres de grille
+num_grids = 5  # Nombre de niveaux de grille
+
 # Gestion des risques
 stop_loss_multiplier = 2  # Basé sur l'ATR
+take_profit_multiplier = 1.5
+
+# Indicateurs techniques
+def calculate_rsi(data, period=14):
+    delta = data['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    data['RSI'] = rsi
+    return data
+
+def calculate_bollinger_bands(data, period=20, std_dev=2):
+    data['SMA20'] = data['close'].rolling(window=period).mean()
+    data['BB_Upper'] = data['SMA20'] + std_dev * data['close'].rolling(window=period).std()
+    data['BB_Lower'] = data['SMA20'] - std_dev * data['close'].rolling(window=period).std()
+    return data
 
 # Fonction pour récupérer les données OHLC
 def get_ohlcv(symbol):
@@ -25,12 +51,6 @@ def get_ohlcv(symbol):
     except Exception as e:
         print(f"Erreur lors de la récupération des données : {e}")
         return None
-
-# Calcul des moyennes mobiles
-def calculate_sma(data):
-    data['SMA10'] = data['close'].rolling(window=short_window).mean()
-    data['SMA100'] = data['close'].rolling(window=long_window).mean()
-    return data
 
 # Fonction de prise de position
 def place_order(symbol, side, amount):
@@ -49,15 +69,23 @@ while True:
             data = get_ohlcv(symbol)
             if data is None:
                 continue
-            data = calculate_sma(data)
+            data = calculate_rsi(data)
+            data = calculate_bollinger_bands(data)
 
-            # Signaux d'achat/vente
-            if data['SMA10'].iloc[-1] > data['SMA100'].iloc[-1]:
-                print(f"Signal d'achat détecté pour {symbol}")
+            # Grille de trading
+            last_price = data['close'].iloc[-1]
+            for i in range(-num_grids, num_grids + 1):
+                grid_price = last_price * (1 + i * grid_spacing)
+                side = 'buy' if i < 0 else 'sell'
+                print(f"Placing grid order at {grid_price} for {symbol}")
+                place_order(symbol, side, 15 / len(symbols))
+
+            # Signaux d'achat/vente avec RSI et Bollinger
+            if data['RSI'].iloc[-1] < 30 and last_price < data['BB_Lower'].iloc[-1]:
+                print(f"Signal d'achat détecté pour {symbol} (RSI et Bollinger)")
                 place_order(symbol, 'buy', 15 / len(symbols))
-
-            elif data['SMA10'].iloc[-1] < data['SMA100'].iloc[-1]:
-                print(f"Signal de vente détecté pour {symbol}")
+            elif data['RSI'].iloc[-1] > 70 and last_price > data['BB_Upper'].iloc[-1]:
+                print(f"Signal de vente détecté pour {symbol} (RSI et Bollinger)")
                 place_order(symbol, 'sell', 15 / len(symbols))
 
             time.sleep(30)  # Attendre 30 secondes avant la prochaine itération
