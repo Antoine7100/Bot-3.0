@@ -124,7 +124,7 @@ def place_order(symbol, side, amount):
         nb_trades += 1
         pnl = amount * float(price) * (1 if side == 'buy' else -1)
         gains_pertes += pnl
-        message = (f"Ordre {side.upper()} exécuté pour {symbol}
+        message = (f"Ordre {side.upper()} exécuté pour {symbol}")
 Montant: {amount}
 Prix: {price}
 PnL estimé: {pnl} USDT
