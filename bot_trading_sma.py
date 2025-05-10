@@ -104,6 +104,22 @@ class BotTrader:
         self.timeframe = '5m'
         self.tp_percentage = 0.02
         self.sl_percentage = 0.01
+        self.daily_loss_limit = 100  # Limite de perte journalière en USDT
+        self.daily_loss = 0
+        self.current_day = time.strftime('%Y-%m-%d')
+
+    def reset_daily_loss(self):
+        self.daily_loss = 0
+        self.current_day = time.strftime('%Y-%m-%d')
+        logging.info("🔄 Réinitialisation de la perte journalière.")
+
+    def update_daily_loss(self, loss):
+        self.daily_loss += loss
+        if self.daily_loss >= self.daily_loss_limit:
+            logging.warning("🚫 Limite de perte journalière atteinte, arrêt des trades pour aujourd'hui.")
+            notifier.send_message("🚫 Limite de perte journalière atteinte, arrêt des trades.", '❗')
+            return False
+        return True
 
     def calculate_tp_sl(self, entry_price):
         tp = entry_price * (1 + self.tp_percentage)
@@ -112,6 +128,8 @@ class BotTrader:
 
     def monitor_positions(self):
         while True:
+            if time.strftime('%Y-%m-%d') != self.current_day:
+                self.reset_daily_loss()
             for pos in trade_manager.positions[:]:
                 try:
                     current_price = self.exchange.fetch_ticker(pos['symbol'])['last']
@@ -120,9 +138,13 @@ class BotTrader:
                         trade_manager.positions.remove(pos)
                         trade_manager.save_data()
                     elif current_price <= pos['sl']:
-                        notifier.send_message(f"🔻 SL atteint pour {pos['symbol']} à {current_price} USDT")
-                        trade_manager.positions.remove(pos)
-                        trade_manager.save_data()
+                        loss = pos['entry_price'] - current_price
+                        if self.update_daily_loss(loss):
+                            notifier.send_message(f"🔻 SL atteint pour {pos['symbol']} à {current_price} USDT")
+                            trade_manager.positions.remove(pos)
+                            trade_manager.save_data()
+                        else:
+                            notifier.send_message(f"❗ Stop trading atteint pour la journée : perte de {self.daily_loss} USDT", '🚫')
                 except Exception as e:
                     logging.error(f"Erreur lors de la vérification TP/SL : {e}")
             time.sleep(30)
@@ -148,6 +170,7 @@ class BotTrader:
         except Exception as e:
             notifier.send_message(f"❌ Erreur lors de la prise d'ordre : {e}")
             logging.error(f"Erreur lors de la prise d'ordre : {e}")
+
 
     def run_bot(self):
         while True:
