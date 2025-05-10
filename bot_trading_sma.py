@@ -72,7 +72,7 @@ class TradeManager:
         except Exception as e:
             logging.error(f"Erreur lors de la sauvegarde des données : {e}")
 
-  def log_trade(self, symbol, side, amount, price, pnl):
+   def log_trade(self, symbol, side, amount, price, pnl):
         try:
             trade_entry = {
                 'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
@@ -88,7 +88,6 @@ class TradeManager:
             logging.info(f'Trade enregistré : {trade_entry}')
         except Exception as e:
             logging.error(f'Erreur lors de la journalisation du trade : {e}')
-
 
 trade_manager = TradeManager()
 
