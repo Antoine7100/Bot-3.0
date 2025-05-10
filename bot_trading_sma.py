@@ -109,7 +109,7 @@ def get_balance(asset):
 def place_order(symbol, side, amount):
     try:
         asset = symbol.split('/')[0]
-        available_balance = get_balance(asset)
+        available_balance = calculate_position_size(get_balance(asset))
 
         if available_balance < amount:
             send_telegram_message(f"Solde insuffisant pour prendre la position : {amount} {asset} disponible : {available_balance}")
@@ -124,17 +124,17 @@ def place_order(symbol, side, amount):
         nb_trades += 1
         pnl = amount * float(price) * (1 if side == 'buy' else -1)
         gains_pertes += pnl
-       message = (f"Ordre {side.upper()} exécuté pour {symbol}\n"
-           f"Montant: {amount}\n"
-           f"Prix: {price}\n"
-           f"PnL estimé: {pnl} USDT\n"
-           f"Total PnL: {gains_pertes} USDT")
-
+        message = (f"Ordre {side.upper()} exécuté pour {symbol}\n"
+                   f"Montant: {amount}\n"
+                   f"Prix: {price}\n"
+                   f"PnL estimé: {pnl} USDT\n"
+                   f"Total PnL: {gains_pertes} USDT")
         send_telegram_message(message)
         return order
     except Exception as e:
         send_telegram_message(f"Erreur lors de la prise d'ordre : {e}")
         return None
+
 
 # Fonction de trading en arrière-plan
 def run_bot():
