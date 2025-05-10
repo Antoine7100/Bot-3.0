@@ -20,6 +20,31 @@ trades = []
 gains_pertes = 0
 nb_trades = 0
 
+# Charger les données depuis les fichiers
+def load_data():
+    global positions, trades, gains_pertes, nb_trades
+    try:
+        if os.path.exists(POSITIONS_FILE):
+            with open(POSITIONS_FILE, 'r') as f:
+                positions = json.load(f)
+        if os.path.exists(TRADES_FILE):
+            with open(TRADES_FILE, 'r') as f:
+                trades = json.load(f)
+        print("Données chargées avec succès.")
+    except Exception as e:
+        print(f"Erreur lors du chargement des données : {e}")
+
+# Sauvegarder les données dans les fichiers
+def save_data():
+    try:
+        with open(POSITIONS_FILE, 'w') as f:
+            json.dump(positions, f)
+        with open(TRADES_FILE, 'w') as f:
+            json.dump(trades, f)
+        print("Données sauvegardées avec succès.")
+    except Exception as e:
+        print(f"Erreur lors de la sauvegarde des données : {e}")
+
 # Fonction pour envoyer un message Telegram
 def send_telegram_message(message):
     try:
@@ -46,6 +71,8 @@ def schedule_daily_summary():
 def home():
     return 'Bot de Trading SMA 10/100 - En cours de fonctionnement!'
 
+# Route pour afficher les positions ouvertes
+@app.route('/positions')
 @app.route('/positions')
 def get_positions():
     try:
@@ -57,7 +84,6 @@ def get_positions():
             return jsonify({"message": "Aucune position ouverte actuellement."}), 200
     except Exception as e:
         return jsonify({"error": f"Erreur lors de l'affichage des positions : {str(e)}"}), 500
-
 
 
 # Fonction pour envoyer les positions via Telegram
