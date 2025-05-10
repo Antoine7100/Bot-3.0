@@ -60,13 +60,14 @@ def positions():
 
 # Fonction pour envoyer les positions via Telegram
 def send_positions_telegram():
-    if positions:
-        message = "Positions ouvertes sur Bybit :\n"
-        for pos in positions:
-            message += (f"Symbole: {pos['symbol']}\nType: {pos['side']}\nQuantité: {pos['amount']}\nPrix: {pos['price']} USDT\n\n")
+    current_positions = fetch_positions()
+    if current_positions:
+        message = "📊 Positions ouvertes sur Bybit :\n"
+        for pos in current_positions:
+            message += (f"🔄 Symbole: {pos['symbol']}\n🪙 Type: {pos['side']}\n📏 Quantité: {pos['size']}\n💰 Prix d'entrée: {pos['entry_price']} USDT\n📈 PnL non réalisé: {pos['unrealised_pnl']} USDT\n\n")
         send_telegram_message(message)
     else:
-        send_telegram_message("Aucune position ouverte actuellement.")
+        send_telegram_message("🚫 Aucune position ouverte actuellement.")
 
 # Configuration du bot
 exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
@@ -109,12 +110,6 @@ def get_balance(asset):
 def place_order(symbol, side, amount):
     try:
         asset = symbol.split('/')[0]
-        available_balance = calculate_position_size(get_balance(asset))
-
-        if available_balance < amount:
-            send_telegram_message(f"Solde insuffisant pour prendre la position : {amount} {asset} disponible : {available_balance}")
-            return None
-
         print(f"Placing {side} order for {amount} {symbol}")
         order = exchange.create_order(symbol, 'market', side, amount)
         price = order['price'] if 'price' in order else 'N/A'
@@ -124,15 +119,15 @@ def place_order(symbol, side, amount):
         nb_trades += 1
         pnl = amount * float(price) * (1 if side == 'buy' else -1)
         gains_pertes += pnl
-        message = (f"Ordre {side.upper()} exécuté pour {symbol}\n"
-                   f"Montant: {amount}\n"
-                   f"Prix: {price}\n"
-                   f"PnL estimé: {pnl} USDT\n"
-                   f"Total PnL: {gains_pertes} USDT")
+        message = (f"🚀 Ordre {side.upper()} exécuté pour {symbol}\n"
+                   f"✅ Montant: {amount}\n"
+                   f"💵 Prix: {price}\n"
+                   f"📊 PnL estimé: {pnl} USDT\n"
+                   f"🔗 Total PnL: {gains_pertes} USDT")
         send_telegram_message(message)
         return order
     except Exception as e:
-        send_telegram_message(f"Erreur lors de la prise d'ordre : {e}")
+        send_telegram_message(f"❌ Erreur lors de la prise d'ordre : {e}")
         return None
 
 
