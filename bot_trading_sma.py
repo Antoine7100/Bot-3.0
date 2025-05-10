@@ -125,7 +125,7 @@ class BotTrader:
         self.daily_loss_limit = 100  # Limite de perte journalière en USDT
         self.daily_loss = 0
         self.current_day = time.strftime('%Y-%m-%d')
-
+        
     def reset_daily_loss(self):
         self.daily_loss = 0
         self.current_day = time.strftime('%Y-%m-%d')
@@ -167,7 +167,7 @@ class BotTrader:
                     logging.error(f"Erreur lors de la vérification TP/SL : {e}")
             time.sleep(30)
 
-     def run_bot(self):
+      def run_bot(self):
         while True:
             for symbol in self.symbols:
                 try:
@@ -195,13 +195,13 @@ class BotTrader:
                     if sma10 > sma100 and current_rsi < 50:
                         logging.info(f"🚀 Signal agressif d'achat pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
                         notifier.send_message(f"🚀 Signal d'achat agressif pour {symbol}", '📈')
-                        self.place_order(symbol, 'buy', 5)  # Augmenter la taille du trade pour l'agressivité
-                        trade_manager.log_trade(symbol, 'buy', 20, sma10, 0)
+                        self.place_order(symbol, 'buy', 5)
+                        trade_manager.log_trade(symbol, 'buy', 5, sma10, 0)
                     elif sma10 < sma100 and current_rsi > 50:
                         logging.info(f"🔻 Signal agressif de vente pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
                         notifier.send_message(f"🔻 Signal de vente agressif pour {symbol}", '📉')
                         self.place_order(symbol, 'sell', 5)
-                        trade_manager.log_trade(symbol, 'sell', 20, sma100, 0)
+                        trade_manager.log_trade(symbol, 'sell', 5, sma100, 0)
                     else:
                         logging.info(f"🔍 Aucun signal agressif détecté pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
 
