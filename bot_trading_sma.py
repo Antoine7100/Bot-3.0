@@ -42,7 +42,7 @@ def test_order():
         send_telegram_message(message)
         return jsonify({'status': 'success', 'message': message}), 200
     except Exception as e:
-        message = f'❌ Erreur lors du test de prise d'ordre: {e}'
+        message = f"❌ Erreur lors du test de prise d'ordre : {e}"
         send_telegram_message(message)
         return jsonify({'status': 'error', 'message': message}), 500
 
