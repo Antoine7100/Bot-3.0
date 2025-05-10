@@ -125,7 +125,7 @@ class BotTrader:
         self.daily_loss_limit = 100  # Limite de perte journalière en USDT
         self.daily_loss = 0
         self.current_day = time.strftime('%Y-%m-%d')
-        
+
     def reset_daily_loss(self):
         self.daily_loss = 0
         self.current_day = time.strftime('%Y-%m-%d')
@@ -167,7 +167,16 @@ class BotTrader:
                     logging.error(f"Erreur lors de la vérification TP/SL : {e}")
             time.sleep(30)
 
-      def run_bot(self):
+    def place_order(self, symbol, side, amount):
+        try:
+            order = self.exchange.create_order(symbol, 'market', side, amount)
+            logging.info(f"✅ Ordre {side} exécuté pour {symbol} avec montant {amount} USDT")
+            return order
+        except Exception as e:
+            logging.error(f"❗ Erreur lors du passage d'ordre pour {symbol}: {e}")
+            return None
+
+    def run_bot(self):
         while True:
             for symbol in self.symbols:
                 try:
@@ -213,8 +222,7 @@ class BotTrader:
                     time.sleep(10)
                 except Exception as e:
                     logging.error(f"❗ Erreur inattendue dans la boucle de trading pour {symbol} : {e}")
-                time.sleep(15)  # Délai réduit pour rendre le bot plus réactif
-
+                time.sleep(15)
 
 bot = BotTrader()
 
