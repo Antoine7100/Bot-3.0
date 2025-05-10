@@ -17,6 +17,24 @@ app = Flask(__name__)
 # Configuration du fichier de log
 logging.basicConfig(filename='trading_bot.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def test_fetch_ohlcv(symbol='DOGE/USDT', timeframe='1m'):
+    try:
+        exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
+        logging.info(f"🔍 Test de récupération des données OHLCV pour {symbol} avec la période {timeframe}")
+        data = exchange.fetch_ohlcv(symbol, timeframe)
+        if data and len(data) > 0:
+            df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            logging.info(f"✅ Données récupérées pour {symbol} :\n{df.tail()}")
+            print(df.tail())
+        else:
+            logging.warning(f"⚠️ Aucune donnée OHLCV récupérée pour {symbol}")
+    except Exception as e:
+        logging.error(f"❗ Erreur lors de la récupération des données OHLCV pour {symbol} : {e}")
+        print(f"❗ Erreur : {e}")
+
+# Test direct de la récupération des données OHLCV
+test_fetch_ohlcv()
+
 class TelegramNotifier:
     def __init__(self):
         self.token = os.getenv('TELEGRAM_TOKEN')
