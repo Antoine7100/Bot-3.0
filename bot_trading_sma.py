@@ -180,7 +180,7 @@ class BotTrader:
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                     sma10 = df['close'].rolling(window=10).mean().iloc[-1]
                     sma100 = df['close'].rolling(window=100).mean().iloc[-1]
-                   Croisement vérifié pour DOGE/USDT: SMA10=0.0725, SMA100=0.0718
+                    logging.info(f"Croisement vérifié pour {symbol}: SMA10={sma10}, SMA100={sma100}")
                     if sma10 > sma100:
                         notifier.send_message(f"🚀 Croisement haussier détecté pour {symbol}", '📈')
                         self.place_order(symbol, 'buy', 15)
@@ -192,6 +192,7 @@ class BotTrader:
                 except Exception as e:
                     logging.error(f"Erreur dans la boucle de trading pour {symbol} : {e}")
                 time.sleep(30)
+
 
 bot = BotTrader()
 
