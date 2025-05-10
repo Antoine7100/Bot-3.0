@@ -1,5 +1,6 @@
 ### Code complet et optimisé du bot de trading avec toutes les fonctionnalités
 
+```python
 import ccxt
 import pandas as pd
 import numpy as np
@@ -84,8 +85,8 @@ class TradeManager:
             }
             with open(self.trades_log, 'a') as f:
                 json.dump(trade_entry, f)
-                f.write('
-')
+f.write('\n')
+
             logging.info(f"Trade enregistré : {trade_entry}")
         except Exception as e:
             logging.error(f"Erreur lors de la journalisation du trade : {e}")
@@ -123,6 +124,28 @@ class BotTrader:
             time.sleep(30)
 
     def place_order(self, symbol, side, amount):
+        try:
+            # Vérifier le solde disponible pour éviter les ordres non exécutés
+            balance = self.exchange.fetch_balance()
+            usdt_balance = balance['free'].get('USDT', 0)
+            # Utiliser 50% du solde disponible pour chaque ordre
+            order_amount = min(amount, usdt_balance * 0.5)
+
+            if order_amount <= 0:
+                notifier.send_message(f"🚫 Solde insuffisant pour passer un ordre sur {symbol}", '⚠️')
+                return None
+
+            order = self.exchange.create_order(symbol, 'market', side, order_amount)
+            entry_price = order['price'] if 'price' in order else self.exchange.fetch_ticker(symbol)['last']
+            tp, sl = self.calculate_tp_sl(entry_price)
+            trade_manager.positions.append({'symbol': symbol, 'side': side, 'amount': order_amount, 'entry_price': entry_price, 'tp': tp, 'sl': sl})
+            trade_manager.save_data()
+            notifier.send_order_notification(symbol, side, order_amount, entry_price, 0)
+            logging.info(f"Ordre {side} pour {symbol} exécuté avec {order_amount} USDT à {entry_price}, TP: {tp}, SL: {sl}")
+            return order
+        except Exception as e:
+            notifier.send_message(f"❌ Erreur lors de la prise d'ordre : {e}")
+            logging.error(f"Erreur lors de la prise d'ordre : {e}")
         try:
             # Vérifier le solde disponible pour éviter les ordres non exécutés
             balance = self.exchange.fetch_balance()
