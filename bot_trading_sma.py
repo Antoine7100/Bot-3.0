@@ -1,6 +1,5 @@
 ### Code complet et optimisé du bot de trading avec toutes les fonctionnalités
 
-```python
 import ccxt
 import pandas as pd
 import numpy as np
