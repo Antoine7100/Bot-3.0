@@ -46,16 +46,18 @@ def schedule_daily_summary():
 def home():
     return 'Bot de Trading SMA 10/100 - En cours de fonctionnement!'
 
-# Route pour afficher les positions ouvertes
 @app.route('/positions')
-def positions():
+def get_positions():
     try:
-        if positions:
-            return jsonify(positions), 200
+        # Filtrer les positions pour ne conserver que les informations sérialisables
+        serializable_positions = [{k: v for k, v in pos.items() if not callable(v)} for pos in positions]
+        if serializable_positions:
+            return jsonify(serializable_positions), 200
         else:
             return jsonify({"message": "Aucune position ouverte actuellement."}), 200
     except Exception as e:
         return jsonify({"error": f"Erreur lors de l'affichage des positions : {str(e)}"}), 500
+
 
 
 # Fonction pour envoyer les positions via Telegram
