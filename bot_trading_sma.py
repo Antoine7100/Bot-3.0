@@ -26,6 +26,10 @@ trades = []
 gains_pertes = 0
 nb_trades = 0
 
+# Paramètres de Take Profit (TP) et Stop Loss (SL)
+tp_percentage = 0.02  # 2% de gain
+sl_percentage = 0.01  # 1% de perte
+
 # Charger les données depuis les fichiers
 def load_data():
     global positions, trades, gains_pertes, nb_trades
@@ -60,6 +64,21 @@ def send_telegram_message(message):
         print(f"Message Telegram envoyé : {message}")
     except Exception as e:
         print(f"Erreur lors de l'envoi du message Telegram : {e}")
+
+# Fonction pour calculer TP et SL
+def calculate_tp_sl(entry_price):
+    tp = entry_price * (1 + tp_percentage)
+    sl = entry_price * (1 - sl_percentage)
+    return tp, sl
+
+# Fonction pour vérifier si TP ou SL est atteint
+def check_tp_sl(current_price, tp, sl):
+    if current_price >= tp:
+        return 'tp'
+    elif current_price <= sl:
+        return 'sl'
+    return None
+
 
 # Fonction pour envoyer un résumé quotidien
 def send_daily_summary():
@@ -190,6 +209,29 @@ def run_bot():
             except Exception as e:
                 send_telegram_message(f"Erreur pendant la boucle de trading : {e}")
                 time.sleep(5)
+
+# Fonction pour surveiller les positions et fermer si TP ou SL atteint
+def monitor_positions():
+    while True:
+        for pos in positions[:]:
+            try:
+                current_price = exchange.fetch_ticker(pos['symbol'])['last']
+                result = check_tp_sl(current_price, pos['tp'], pos['sl'])
+                if result == 'tp':
+                    send_telegram_message(f"🎯 Take Profit atteint pour {pos['symbol']} à {current_price} USDT")
+                    positions.remove(pos)
+                    save_data()
+                elif result == 'sl':
+                    send_telegram_message(f"🔻 Stop Loss atteint pour {pos['symbol']} à {current_price} USDT")
+                    positions.remove(pos)
+                    save_data()
+            except Exception as e:
+                print(f"Erreur lors de la vérification TP/SL : {e}")
+        time.sleep(30)
+
+# Lancer la surveillance des positions dans un thread
+monitor_thread = Thread(target=monitor_positions)
+monitor_thread.start()
 
 # Lancer le bot dans un thread
 bot_thread = Thread(target=run_bot)
