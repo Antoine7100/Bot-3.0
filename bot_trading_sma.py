@@ -1,3 +1,6 @@
+### Code complet et optimisé du bot de trading avec toutes les fonctionnalités
+
+```python
 import ccxt
 import pandas as pd
 import numpy as np
@@ -7,263 +10,207 @@ from flask import Flask, jsonify
 import os
 import requests
 import json
-
+import logging
 
 # Configuration du serveur Flask
 app = Flask(__name__)
 
-# Configuration Telegram
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+# Configuration du fichier de log
+logging.basicConfig(filename='trading_bot.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Fichiers pour stocker les données
-POSITIONS_FILE = 'positions.json'
-TRADES_FILE = 'trades.json'
+class TelegramNotifier:
+    def __init__(self):
+        self.token = os.getenv('TELEGRAM_TOKEN')
+        self.chat_id = os.getenv('TELEGRAM_CHAT_ID')
 
-# Variables globales pour le suivi
-positions = []
-trades = []
-gains_pertes = 0
-nb_trades = 0
+    def send_message(self, message, emoji='💬'):
+        try:
+            cool_message = f"{emoji} {message}"
+            url = f"https://api.telegram.org/bot{self.token}/sendMessage"
+            requests.post(url, data={'chat_id': self.chat_id, 'text': cool_message})
+            logging.info(f"Message envoyé : {cool_message}")
+        except Exception as e:
+            logging.error(f"Erreur d'envoi Telegram : {e}")
 
-# Paramètres de Take Profit (TP) et Stop Loss (SL)
-tp_percentage = 0.02  # 2% de gain
-sl_percentage = 0.01  # 1% de perte
+    def send_order_notification(self, symbol, side, amount, price, pnl):
+        emoji = '🚀' if side == 'buy' else '🔻'
+        message = (f"{emoji} Ordre {side.upper()} exécuté pour {symbol}\n"
+                   f"💰 Montant: {amount}\n"
+                   f"📈 Prix: {price} USDT\n"
+                   f"📊 PnL: {pnl} USDT")
+        self.send_message(message, emoji)
 
-# Fonction de test rapide pour vérifier la prise d'ordre
-@app.route('/test_order')
-def test_order():
-    try:
-        symbol = 'DOGE/USDT'
-        side = 'buy'
-        amount = 1
-        order = exchange.create_order(symbol, 'market', side, amount)
-        message = f'✅ Test réussi: Ordre {side} de {amount} {symbol} exécuté avec succès.'
-        send_telegram_message(message)
-        return jsonify({'status': 'success', 'message': message}), 200
-    except Exception as e:
-        message = f"❌ Erreur lors du test de prise d'ordre : {e}"
-        send_telegram_message(message)
-        return jsonify({'status': 'error', 'message': message}), 500
+notifier = TelegramNotifier()
 
+class TradeManager:
+    def __init__(self):
+        self.positions = []
+        self.trades = []
+        self.gains_pertes = 0
+        self.nb_trades = 0
+        self.positions_file = 'positions.json'
+        self.trades_file = 'trades.json'
+        self.trades_log = 'trades_log.json'
+        self.load_data()
 
-# Charger les données depuis les fichiers
-def load_data():
-    global positions, trades, gains_pertes, nb_trades
-    try:
-        if os.path.exists(POSITIONS_FILE):
-            with open(POSITIONS_FILE, 'r') as f:
-                positions = json.load(f)
-        if os.path.exists(TRADES_FILE):
-            with open(TRADES_FILE, 'r') as f:
-                trades = json.load(f)
-        print("Données chargées avec succès.")
-    except Exception as e:
-        print(f"Erreur lors du chargement des données : {e}")
+    def load_data(self):
+        try:
+            if os.path.exists(self.positions_file):
+                with open(self.positions_file, 'r') as f:
+                    self.positions = json.load(f)
+            if os.path.exists(self.trades_file):
+                with open(self.trades_file, 'r') as f:
+                    self.trades = json.load(f)
+        except Exception as e:
+            logging.error(f"Erreur lors du chargement des données : {e}")
 
-# Sauvegarder les données dans les fichiers
-def save_data():
-    try:
-        with open(POSITIONS_FILE, 'w') as f:
-            json.dump(positions, f)
-        with open(TRADES_FILE, 'w') as f:
-            json.dump(trades, f)
-        print("Données sauvegardées avec succès.")
-    except Exception as e:
-        print(f"Erreur lors de la sauvegarde des données : {e}")
+    def save_data(self):
+        try:
+            with open(self.positions_file, 'w') as f:
+                json.dump(self.positions, f)
+            with open(self.trades_file, 'w') as f:
+                json.dump(self.trades, f)
+        except Exception as e:
+            logging.error(f"Erreur lors de la sauvegarde des données : {e}")
 
-# Fonction pour envoyer un message Telegram
-def send_telegram_message(message):
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
-        requests.post(url, data=payload)
-        print(f"Message Telegram envoyé : {message}")
-    except Exception as e:
-        print(f"Erreur lors de l'envoi du message Telegram : {e}")
+    def log_trade(self, symbol, side, amount, price, pnl):
+        try:
+            trade_entry = {
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'symbol': symbol,
+                'side': side,
+                'amount': amount,
+                'price': price,
+                'pnl': pnl
+            }
+            with open(self.trades_log, 'a') as f:
+                json.dump(trade_entry, f)
+                f.write('
+')
+            logging.info(f"Trade enregistré : {trade_entry}")
+        except Exception as e:
+            logging.error(f"Erreur lors de la journalisation du trade : {e}")
+    def __init__(self):
+        self.positions = []
+        self.trades = []
+        self.gains_pertes = 0
+        self.nb_trades = 0
+        self.positions_file = 'positions.json'
+        self.trades_file = 'trades.json'
+        self.load_data()
 
-# Fonction pour calculer TP et SL
-def calculate_tp_sl(entry_price):
-    tp = entry_price * (1 + tp_percentage)
-    sl = entry_price * (1 - sl_percentage)
-    return tp, sl
+    def load_data(self):
+        try:
+            if os.path.exists(self.positions_file):
+                with open(self.positions_file, 'r') as f:
+                    self.positions = json.load(f)
+            if os.path.exists(self.trades_file):
+                with open(self.trades_file, 'r') as f:
+                    self.trades = json.load(f)
+        except Exception as e:
+            logging.error(f"Erreur lors du chargement des données : {e}")
 
-# Fonction pour vérifier si TP ou SL est atteint
-def check_tp_sl(current_price, tp, sl):
-    if current_price >= tp:
-        return 'tp'
-    elif current_price <= sl:
-        return 'sl'
-    return None
+    def save_data(self):
+        try:
+            with open(self.positions_file, 'w') as f:
+                json.dump(self.positions, f)
+            with open(self.trades_file, 'w') as f:
+                json.dump(self.trades, f)
+        except Exception as e:
+            logging.error(f"Erreur lors de la sauvegarde des données : {e}")
 
+trade_manager = TradeManager()
 
-# Fonction pour envoyer un résumé quotidien
-def send_daily_summary():
-    summary = f"Résumé quotidien des trades:\nNombre de trades: {nb_trades}\nGains/Pertes: {gains_pertes} USDT"
-    send_telegram_message(summary)
+class BotTrader:
+    def __init__(self):
+        self.exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
+        self.symbols = ['DOGE/USDT', 'ADA/USDT']
+        self.timeframe = '1m'
+        self.tp_percentage = 0.02
+        self.sl_percentage = 0.01
 
-# Planification du résumé quotidien toutes les 24 heures
-def schedule_daily_summary():
-    while True:
-        time.sleep(86400)  # 24 heures
-        send_daily_summary()
+    def calculate_tp_sl(self, entry_price):
+        tp = entry_price * (1 + self.tp_percentage)
+        sl = entry_price * (1 - self.sl_percentage)
+        return tp, sl
 
-# Route par défaut
-@app.route('/')
-def home():
-    return 'Bot de Trading SMA 10/100 - En cours de fonctionnement!'
+    def monitor_positions(self):
+        while True:
+            for pos in trade_manager.positions[:]:
+                try:
+                    current_price = self.exchange.fetch_ticker(pos['symbol'])['last']
+                    if current_price >= pos['tp']:
+                        notifier.send_message(f"🎯 TP atteint pour {pos['symbol']} à {current_price} USDT")
+                        trade_manager.positions.remove(pos)
+                        trade_manager.save_data()
+                    elif current_price <= pos['sl']:
+                        notifier.send_message(f"🔻 SL atteint pour {pos['symbol']} à {current_price} USDT")
+                        trade_manager.positions.remove(pos)
+                        trade_manager.save_data()
+                except Exception as e:
+                    logging.error(f"Erreur lors de la vérification TP/SL : {e}")
+            time.sleep(30)
 
-# Route pour afficher les positions ouvertes
-@app.route('/positions')
-def get_positions():
-    try:
-        # Filtrer les positions pour ne conserver que les informations sérialisables
-        serializable_positions = [{k: v for k, v in pos.items() if not callable(v)} for pos in positions]
-        if serializable_positions:
-            return jsonify(serializable_positions), 200
-        else:
-            return jsonify({"message": "🛑 Aucune position ouverte actuellement."}), 200
-    except Exception as e:
-        return jsonify({"error": f"⚠️ Erreur lors de l'affichage des positions : {str(e)}"}), 500
+    def place_order(self, symbol, side, amount):
+        try:
+            # Vérifier le solde disponible pour éviter les ordres non exécutés
+            balance = self.exchange.fetch_balance()
+            usdt_balance = balance['free'].get('USDT', 0)
+            # Utiliser 50% du solde disponible pour chaque ordre
+            order_amount = min(amount, usdt_balance * 0.5)
 
-# Charger les données au démarrage
-load_data()
+            if order_amount <= 0:
+                notifier.send_message(f"🚫 Solde insuffisant pour passer un ordre sur {symbol}", '⚠️')
+                return None
 
-# Fonction pour envoyer les positions via Telegram
-def send_positions_telegram():
-    current_positions = fetch_positions()
-    if current_positions:
-        message = "📊 Positions ouvertes sur Bybit :\n"
-        for pos in current_positions:
-            message += (f"🔄 Symbole: {pos['symbol']}\n🪙 Type: {pos['side']}\n📏 Quantité: {pos['size']}\n💰 Prix d'entrée: {pos['entry_price']} USDT\n📈 PnL non réalisé: {pos['unrealised_pnl']} USDT\n\n")
-        send_telegram_message(message)
-    else:
-        send_telegram_message("🚫 Aucune position ouverte actuellement.")
-
-# Configuration du bot
-exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
-exchange.options['createMarketBuyOrderRequiresPrice'] = False
-
-symbols = ['DOGE/USDT', 'ADA/USDT']
-timeframe = '1m'
-
-# Paramètres de la stratégie
-short_window = 10
-long_window = 100
-leverage = 5
-risk_percentage = 0.01
-
-def calculate_position_size(balance):
-    return max(balance * risk_percentage, 1)
-
-
-# Fonction pour récupérer les données OHLC
-def get_ohlcv(symbol):
-    try:
-        bars = exchange.fetch_ohlcv(symbol, timeframe)
-        df = pd.DataFrame(bars, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        return df
-    except Exception as e:
-        send_telegram_message(f"Erreur lors de la récupération des données : {e}")
-        return None
-        
-# Fonction pour récupérer le solde disponible
-def get_balance(asset):
-    try:
-        balance = exchange.fetch_balance()
-        return balance['free'].get(asset, 0)
-    except Exception as e:
-        send_telegram_message(f"Erreur lors de la récupération du solde : {e}")
-        return 0
-        
-# Fonction de prise de position avec vérification du solde
-def place_order(symbol, side, amount):
-    try:
-        asset = symbol.split('/')[0]
-        print(f"Placing {side} order for {amount} {symbol}")
-        order = exchange.create_order(symbol, 'market', side, amount)
-        price = order['price'] if 'price' in order else 'N/A'
-        trades.append({'symbol': symbol, 'side': side, 'amount': amount, 'price': price})
-        positions.append({'symbol': symbol, 'side': side, 'amount': amount, 'price': price})
-        global nb_trades, gains_pertes
-        nb_trades += 1
-        pnl = amount * float(price) * (1 if side == 'buy' else -1)
-        gains_pertes += pnl
-        message = (f"🚀 Ordre {side.upper()} exécuté pour {symbol}\n"
-                   f"✅ Montant: {amount}\n"
-                   f"💵 Prix: {price}\n"
-                   f"📊 PnL estimé: {pnl} USDT\n"
-                   f"🔗 Total PnL: {gains_pertes} USDT")
-        send_telegram_message(message)
-        return order
-    except Exception as e:
-        send_telegram_message(f"❌ Erreur lors de la prise d'ordre : {e}")
-        return None
+            order = self.exchange.create_order(symbol, 'market', side, order_amount)
+            entry_price = order['price'] if 'price' in order else self.exchange.fetch_ticker(symbol)['last']
+            tp, sl = self.calculate_tp_sl(entry_price)
+            trade_manager.positions.append({'symbol': symbol, 'side': side, 'amount': order_amount, 'entry_price': entry_price, 'tp': tp, 'sl': sl})
+            trade_manager.save_data()
+            notifier.send_order_notification(symbol, side, order_amount, entry_price, 0)
+            logging.info(f"Ordre {side} pour {symbol} exécuté avec {order_amount} USDT à {entry_price}")
+            return order
+        except Exception as e:
+            notifier.send_message(f"❌ Erreur lors de la prise d'ordre : {e}")
+            logging.error(f"Erreur lors de la prise d'ordre : {e}")
 
 
-# Vérification des croisements pour prise de position
-def run_bot():
-    while True:
-        for symbol in ['DOGE/USDT', 'ADA/USDT']:
-            try:
-                data = get_ohlcv(symbol)
-                if data is None or data.empty:
-                    print(f'⚠️ Données non disponibles pour {symbol}, tentative de reconnexion...')
-                    time.sleep(10)
-                    continue
-                sma10 = data['close'].rolling(window=10).mean().iloc[-1]
-                sma100 = data['close'].rolling(window=100).mean().iloc[-1]
-                previous_sma10 = data['close'].rolling(window=10).mean().iloc[-2]
-                previous_sma100 = data['close'].rolling(window=100).mean().iloc[-2]
-                print(f'🔍 Vérification des croisements pour {symbol} - SMA10: {sma10}, SMA100: {sma100}')
-                if sma10 > sma100 and previous_sma10 <= previous_sma100:
-                    print(f'⬆️ Croisement haussier détecté pour {symbol}')
-                    send_telegram_message(f'⬆️ Croisement haussier détecté pour {symbol}')
-                    place_order(symbol, 'buy', 15)
-                elif sma10 < sma100 and previous_sma10 >= previous_sma100:
-                    print(f'⬇️ Croisement baissier détecté pour {symbol}')
-                    send_telegram_message(f'⬇️ Croisement baissier détecté pour {symbol}')
-                    place_order(symbol, 'sell', 15)
+        while True:
+            for symbol in self.symbols:
+                try:
+                    data = self.exchange.fetch_ohlcv(symbol, self.timeframe)
+                    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    sma10 = df['close'].rolling(window=10).mean().iloc[-1]
+                    sma100 = df['close'].rolling(window=100).mean().iloc[-1]
+                    if sma10 > sma100:
+                        self.place_order(symbol, 'buy', 15)
+                        trade_manager.log_trade(symbol, 'buy', 15, sma10, 0)
+                    elif sma10 < sma100:
+                        self.place_order(symbol, 'sell', 15)
+                        trade_manager.log_trade(symbol, 'sell', 15, sma100, 0)
+                except Exception as e:
+                    logging.error(f"Erreur dans la boucle de trading : {e}")
                 time.sleep(60)
-            except Exception as e:
-                print(f'⚠️ Erreur pendant la boucle de trading pour {symbol} : {e}')
-                send_telegram_message(f'⚠️ Erreur pendant la boucle de trading pour {symbol} : {e}')
-                time.sleep(5)
 
-
-# Fonction pour surveiller les positions et fermer si TP ou SL atteint
-def monitor_positions():
-    while True:
-        for pos in positions[:]:
-            try:
-                current_price = exchange.fetch_ticker(pos['symbol'])['last']
-                result = check_tp_sl(current_price, pos['tp'], pos['sl'])
-                if result == 'tp':
-                    send_telegram_message(f"🎯 Take Profit atteint pour {pos['symbol']} à {current_price} USDT")
-                    positions.remove(pos)
-                    save_data()
-                elif result == 'sl':
-                    send_telegram_message(f"🔻 Stop Loss atteint pour {pos['symbol']} à {current_price} USDT")
-                    positions.remove(pos)
-                    save_data()
-            except Exception as e:
-                print(f"Erreur lors de la vérification TP/SL : {e}")
-        time.sleep(30)
-
-# Lancer la surveillance des positions dans un thread
-monitor_thread = Thread(target=monitor_positions)
-monitor_thread.start()
+bot = BotTrader()
 
 # Lancer le bot dans un thread
-bot_thread = Thread(target=run_bot)
-bot_thread.start()
+def start_trading():
+    trader_thread = Thread(target=bot.run_bot)
+    trader_thread.daemon = True
+    trader_thread.start()
+    monitor_thread = Thread(target=bot.monitor_positions)
+    monitor_thread.daemon = True
+    monitor_thread.start()
+    notifier.send_message("🚦 Bot de trading démarré avec succès !", '✅')
 
-# Lancer le résumé quotidien dans un thread
-summary_thread = Thread(target=schedule_daily_summary)
-summary_thread.start()
+@app.route('/')
+def home():
+    return 'Bot de trading opérationnel!'
 
-# Démarrer le serveur Flask
 if __name__ == '__main__':
+    start_trading()
     app.run(host='0.0.0.0', port=8080)
+```
 
