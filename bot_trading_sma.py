@@ -204,6 +204,3 @@ def home():
 if __name__ == '__main__':
     start_trading()
     app.run(host='0.0.0.0', port=8080)
-```
-
-
