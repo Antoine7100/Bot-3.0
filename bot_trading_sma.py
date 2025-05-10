@@ -208,24 +208,29 @@ def run_bot():
         for symbol in ['DOGE/USDT', 'ADA/USDT']:
             try:
                 data = get_ohlcv(symbol)
-                if data is None:
+                if data is None or data.empty:
+                    print(f'⚠️ Données non disponibles pour {symbol}, tentative de reconnexion...')
+                    time.sleep(10)
                     continue
                 sma10 = data['close'].rolling(window=10).mean().iloc[-1]
                 sma100 = data['close'].rolling(window=100).mean().iloc[-1]
                 previous_sma10 = data['close'].rolling(window=10).mean().iloc[-2]
                 previous_sma100 = data['close'].rolling(window=100).mean().iloc[-2]
+                print(f'🔍 Vérification des croisements pour {symbol} - SMA10: {sma10}, SMA100: {sma100}')
                 if sma10 > sma100 and previous_sma10 <= previous_sma100:
-                    print(f'Croisement haussier détecté pour {symbol}')
-                    send_telegram_message(f'Croisement haussier détecté pour {symbol}')
+                    print(f'⬆️ Croisement haussier détecté pour {symbol}')
+                    send_telegram_message(f'⬆️ Croisement haussier détecté pour {symbol}')
                     place_order(symbol, 'buy', 15)
                 elif sma10 < sma100 and previous_sma10 >= previous_sma100:
-                    print(f'Croisement baissier détecté pour {symbol}')
-                    send_telegram_message(f'Croisement baissier détecté pour {symbol}')
+                    print(f'⬇️ Croisement baissier détecté pour {symbol}')
+                    send_telegram_message(f'⬇️ Croisement baissier détecté pour {symbol}')
                     place_order(symbol, 'sell', 15)
                 time.sleep(60)
             except Exception as e:
-                send_telegram_message(f'Erreur pendant la boucle de trading : {e}')
+                print(f'⚠️ Erreur pendant la boucle de trading pour {symbol} : {e}')
+                send_telegram_message(f'⚠️ Erreur pendant la boucle de trading pour {symbol} : {e}')
                 time.sleep(5)
+
 
 # Fonction pour surveiller les positions et fermer si TP ou SL atteint
 def monitor_positions():
