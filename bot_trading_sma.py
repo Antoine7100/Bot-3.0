@@ -101,7 +101,7 @@ class BotTrader:
     def __init__(self):
         self.exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
         self.symbols = ['DOGE/USDT', 'ADA/USDT']
-        self.timeframe = '1m'
+        self.timeframe = '5m'
         self.tp_percentage = 0.02
         self.sl_percentage = 0.01
 
@@ -157,7 +157,7 @@ class BotTrader:
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                     sma10 = df['close'].rolling(window=10).mean().iloc[-1]
                     sma100 = df['close'].rolling(window=100).mean().iloc[-1]
-                    logging.info(f"Croisement vérifié pour {symbol}: SMA10={sma10}, SMA100={sma100}")
+                   Croisement vérifié pour DOGE/USDT: SMA10=0.0725, SMA100=0.0718
                     if sma10 > sma100:
                         notifier.send_message(f"🚀 Croisement haussier détecté pour {symbol}", '📈')
                         self.place_order(symbol, 'buy', 15)
