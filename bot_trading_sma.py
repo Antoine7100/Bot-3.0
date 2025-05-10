@@ -176,11 +176,17 @@ class BotTrader:
         while True:
             for symbol in self.symbols:
                 try:
+                    logging.info(f"🔄 Tentative de récupération des données pour {symbol}...")
                     data = self.exchange.fetch_ohlcv(symbol, self.timeframe)
+                    if not data or len(data) == 0:
+                        logging.warning(f"⚠️ Aucune donnée récupérée pour {symbol}, passage au suivant.")
+                        continue
+
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                     sma10 = df['close'].rolling(window=10).mean().iloc[-1]
                     sma100 = df['close'].rolling(window=100).mean().iloc[-1]
-                    logging.info(f"Croisement vérifié pour {symbol}: SMA10={sma10}, SMA100={sma100}")
+                    logging.info(f"✅ Croisement vérifié pour {symbol}: SMA10={sma10}, SMA100={sma100}")
+
                     if sma10 > sma100:
                         notifier.send_message(f"🚀 Croisement haussier détecté pour {symbol}", '📈')
                         self.place_order(symbol, 'buy', 15)
@@ -189,8 +195,17 @@ class BotTrader:
                         notifier.send_message(f"🔻 Croisement baissier détecté pour {symbol}", '📉')
                         self.place_order(symbol, 'sell', 15)
                         trade_manager.log_trade(symbol, 'sell', 15, sma100, 0)
+                    else:
+                        logging.info(f"🔍 Aucun croisement détecté pour {symbol}")
+
+                except ccxt.NetworkError as e:
+                    logging.error(f"🌐 Erreur réseau pour {symbol}: {e}")
+                    time.sleep(10)
+                except ccxt.ExchangeError as e:
+                    logging.error(f"💥 Erreur d'échange pour {symbol}: {e}")
+                    time.sleep(10)
                 except Exception as e:
-                    logging.error(f"Erreur dans la boucle de trading pour {symbol} : {e}")
+                    logging.error(f"❗ Erreur inattendue dans la boucle de trading pour {symbol} : {e}")
                 time.sleep(30)
 
 
