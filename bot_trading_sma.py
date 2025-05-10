@@ -85,8 +85,7 @@ class TradeManager:
             }
             with open(self.trades_log, 'a') as f:
                 json.dump(trade_entry, f)
-                f.write('
-')
+f.write('\n')
             logging.info(f"Trade enregistré : {trade_entry}")
         except Exception as e:
             logging.error(f"Erreur lors de la journalisation du trade : {e}")
