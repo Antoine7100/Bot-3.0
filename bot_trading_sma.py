@@ -49,7 +49,6 @@ class TradeManager:
         self.nb_trades = 0
         self.positions_file = 'positions.json'
         self.trades_file = 'trades.json'
-        self.trades_log = 'trades_log.json'
         self.load_data()
 
     def load_data(self):
@@ -72,7 +71,7 @@ class TradeManager:
         except Exception as e:
             logging.error(f"Erreur lors de la sauvegarde des données : {e}")
 
-   def log_trade(self, symbol, side, amount, price, pnl):
+    def log_trade(self, symbol, side, amount, price, pnl):
         try:
             trade_entry = {
                 'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
@@ -88,6 +87,7 @@ class TradeManager:
             logging.info(f'Trade enregistré : {trade_entry}')
         except Exception as e:
             logging.error(f'Erreur lors de la journalisation du trade : {e}')
+
 
 trade_manager = TradeManager()
 
