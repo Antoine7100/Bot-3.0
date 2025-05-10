@@ -1,6 +1,5 @@
 ### Code complet et optimisé du bot de trading avec toutes les fonctionnalités
 
-```python
 import ccxt
 import pandas as pd
 import numpy as np
@@ -90,72 +89,6 @@ class TradeManager:
             logging.info(f"Trade enregistré : {trade_entry}")
         except Exception as e:
             logging.error(f"Erreur lors de la journalisation du trade : {e}")
-    
-        self.trades = []
-        self.gains_pertes = 0
-        self.nb_trades = 0
-        self.positions_file = 'positions.json'
-        self.trades_file = 'trades.json'
-        self.trades_log = 'trades_log.json'
-        self.load_data()
-
-    def load_data(self):
-        try:
-            if os.path.exists(self.positions_file):
-                with open(self.positions_file, 'r') as f:
-                    self.positions = json.load(f)
-            if os.path.exists(self.trades_file):
-                with open(self.trades_file, 'r') as f:
-                    self.trades = json.load(f)
-        except Exception as e:
-            logging.error(f"Erreur lors du chargement des données : {e}")
-
-    def save_data(self):
-        try:
-            with open(self.positions_file, 'w') as f:
-                json.dump(self.positions, f)
-            with open(self.trades_file, 'w') as f:
-                json.dump(self.trades, f)
-        except Exception as e:
-            logging.error(f"Erreur lors de la sauvegarde des données : {e}")
-
-    def log_trade(self, symbol, side, amount, price, pnl):
-        try:
-            trade_entry = {
-                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'symbol': symbol,
-                'side': side,
-                'amount': amount,
-                'price': price,
-                'pnl': pnl
-            }
-            with open(self.trades_log, 'a') as f:
-                json.dump(trade_entry, f)
-                f.write('
-')
-            logging.info(f"Trade enregistré : {trade_entry}")
-        except Exception as e:
-            logging.error(f"Erreur lors de la journalisation du trade : {e}")
-        
-    def load_data(self):
-        try:
-            if os.path.exists(self.positions_file):
-                with open(self.positions_file, 'r') as f:
-                    self.positions = json.load(f)
-            if os.path.exists(self.trades_file):
-                with open(self.trades_file, 'r') as f:
-                    self.trades = json.load(f)
-        except Exception as e:
-            logging.error(f"Erreur lors du chargement des données : {e}")
-
-    def save_data(self):
-        try:
-            with open(self.positions_file, 'w') as f:
-                json.dump(self.positions, f)
-            with open(self.trades_file, 'w') as f:
-                json.dump(self.trades, f)
-        except Exception as e:
-            logging.error(f"Erreur lors de la sauvegarde des données : {e}")
 
 trade_manager = TradeManager()
 
@@ -251,4 +184,5 @@ if __name__ == '__main__':
     start_trading()
     app.run(host='0.0.0.0', port=8080)
 ```
+
 
