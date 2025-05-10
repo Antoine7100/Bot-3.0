@@ -149,6 +149,27 @@ class BotTrader:
             notifier.send_message(f"❌ Erreur lors de la prise d'ordre : {e}")
             logging.error(f"Erreur lors de la prise d'ordre : {e}")
 
+    def run_bot(self):
+        while True:
+            for symbol in self.symbols:
+                try:
+                    data = self.exchange.fetch_ohlcv(symbol, self.timeframe)
+                    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    sma10 = df['close'].rolling(window=10).mean().iloc[-1]
+                    sma100 = df['close'].rolling(window=100).mean().iloc[-1]
+                    logging.info(f"Croisement vérifié pour {symbol}: SMA10={sma10}, SMA100={sma100}")
+                    if sma10 > sma100:
+                        notifier.send_message(f"🚀 Croisement haussier détecté pour {symbol}", '📈')
+                        self.place_order(symbol, 'buy', 15)
+                        trade_manager.log_trade(symbol, 'buy', 15, sma10, 0)
+                    elif sma10 < sma100:
+                        notifier.send_message(f"🔻 Croisement baissier détecté pour {symbol}", '📉')
+                        self.place_order(symbol, 'sell', 15)
+                        trade_manager.log_trade(symbol, 'sell', 15, sma100, 0)
+                except Exception as e:
+                    logging.error(f"Erreur dans la boucle de trading pour {symbol} : {e}")
+                time.sleep(30)
+
 bot = BotTrader()
 
 # Lancer le bot dans un thread
@@ -167,4 +188,6 @@ def home():
 
 if __name__ == '__main__':
     start_trading()
+    app.run(host='0.0.0.0', port=8080)
+
     app.run(host='0.0.0.0', port=8080)
