@@ -6,6 +6,8 @@ from threading import Thread
 from flask import Flask, jsonify
 import os
 import requests
+import json
+
 
 # Configuration du serveur Flask
 app = Flask(__name__)
@@ -13,6 +15,10 @@ app = Flask(__name__)
 # Configuration Telegram
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+
+# Fichiers pour stocker les données
+POSITIONS_FILE = 'positions.json'
+TRADES_FILE = 'trades.json'
 
 # Variables globales pour le suivi
 positions = []
@@ -73,7 +79,6 @@ def home():
 
 # Route pour afficher les positions ouvertes
 @app.route('/positions')
-@app.route('/positions')
 def get_positions():
     try:
         # Filtrer les positions pour ne conserver que les informations sérialisables
@@ -81,10 +86,12 @@ def get_positions():
         if serializable_positions:
             return jsonify(serializable_positions), 200
         else:
-            return jsonify({"message": "Aucune position ouverte actuellement."}), 200
+            return jsonify({"message": "🛑 Aucune position ouverte actuellement."}), 200
     except Exception as e:
-        return jsonify({"error": f"Erreur lors de l'affichage des positions : {str(e)}"}), 500
+        return jsonify({"error": f"⚠️ Erreur lors de l'affichage des positions : {str(e)}"}), 500
 
+# Charger les données au démarrage
+load_data()
 
 # Fonction pour envoyer les positions via Telegram
 def send_positions_telegram():
