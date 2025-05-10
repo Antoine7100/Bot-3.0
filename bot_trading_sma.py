@@ -167,7 +167,7 @@ class BotTrader:
                     logging.error(f"Erreur lors de la vérification TP/SL : {e}")
             time.sleep(30)
 
-    def run_bot(self):
+     def run_bot(self):
         while True:
             for symbol in self.symbols:
                 try:
@@ -180,21 +180,30 @@ class BotTrader:
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                     sma10 = df['close'].rolling(window=10).mean().iloc[-1]
                     sma100 = df['close'].rolling(window=100).mean().iloc[-1]
-                    logging.info(f"✅ Données brutes :\n{df.tail()}")
-                    logging.info(f"✅ SMA10 calculée : {sma10}, SMA100 calculée : {sma100}")
 
-                    if sma10 > sma100:
-                        logging.info(f"🚀 Croisement haussier détecté pour {symbol}: SMA10={sma10}, SMA100={sma100}")
-                        notifier.send_message(f"🚀 Croisement haussier détecté pour {symbol}", '📈')
-                        self.place_order(symbol, 'buy', 15)
-                        trade_manager.log_trade(symbol, 'buy', 15, sma10, 0)
-                    elif sma10 < sma100:
-                        logging.info(f"🔻 Croisement baissier détecté pour {symbol}: SMA10={sma10}, SMA100={sma100}")
-                        notifier.send_message(f"🔻 Croisement baissier détecté pour {symbol}", '📉')
-                        self.place_order(symbol, 'sell', 15)
-                        trade_manager.log_trade(symbol, 'sell', 15, sma100, 0)
+                    # Calcul du RSI sur 14 périodes
+                    delta = df['close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rs = gain / loss
+                    rsi = 100 - (100 / (1 + rs))
+                    current_rsi = rsi.iloc[-1]
+
+                    logging.info(f"✅ SMA10: {sma10}, SMA100: {sma100}, RSI: {current_rsi}")
+
+                    # Stratégie agressive basée sur SMA et RSI
+                    if sma10 > sma100 and current_rsi < 50:
+                        logging.info(f"🚀 Signal agressif d'achat pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
+                        notifier.send_message(f"🚀 Signal d'achat agressif pour {symbol}", '📈')
+                        self.place_order(symbol, 'buy', 5)  # Augmenter la taille du trade pour l'agressivité
+                        trade_manager.log_trade(symbol, 'buy', 20, sma10, 0)
+                    elif sma10 < sma100 and current_rsi > 50:
+                        logging.info(f"🔻 Signal agressif de vente pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
+                        notifier.send_message(f"🔻 Signal de vente agressif pour {symbol}", '📉')
+                        self.place_order(symbol, 'sell', 5)
+                        trade_manager.log_trade(symbol, 'sell', 20, sma100, 0)
                     else:
-                        logging.info(f"🔍 Aucun croisement détecté pour {symbol}: SMA10={sma10}, SMA100={sma100}")
+                        logging.info(f"🔍 Aucun signal agressif détecté pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
 
                 except ccxt.NetworkError as e:
                     logging.error(f"🌐 Erreur réseau pour {symbol}: {e}")
@@ -204,7 +213,7 @@ class BotTrader:
                     time.sleep(10)
                 except Exception as e:
                     logging.error(f"❗ Erreur inattendue dans la boucle de trading pour {symbol} : {e}")
-                time.sleep(30)
+                time.sleep(15)  # Délai réduit pour rendre le bot plus réactif
 
 
 bot = BotTrader()
