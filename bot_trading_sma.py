@@ -81,9 +81,9 @@ long_window = 100
 leverage = 5
 risk_percentage = 0.01
 
-# Gestion des risques dynamiques
 def calculate_position_size(balance):
     return max(balance * risk_percentage, 1)
+
 
 # Fonction pour récupérer les données OHLC
 def get_ohlcv(symbol):
@@ -155,7 +155,7 @@ def run_bot():
                     print(f"Croisement baissier détecté pour {symbol}")
                     send_telegram_message(f"Croisement baissier détecté pour {symbol}")
                     place_order(symbol, 'sell', 15 / len(symbols))
-                time.sleep(30)
+                time.sleep(60)
             except Exception as e:
                 send_telegram_message(f"Erreur pendant la boucle de trading : {e}")
                 time.sleep(5)
