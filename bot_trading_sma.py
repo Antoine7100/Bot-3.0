@@ -72,23 +72,23 @@ class TradeManager:
         except Exception as e:
             logging.error(f"Erreur lors de la sauvegarde des données : {e}")
 
-    def log_trade(self, symbol, side, amount, price, pnl):
-        try:
-            trade_entry = {
-                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'symbol': symbol,
-                'side': side,
-                'amount': amount,
-                'price': price,
-                'pnl': pnl
-            }
-            with open(self.trades_log, 'a') as f:
-                json.dump(trade_entry, f)
-f.write('\n')
+  def log_trade(self, symbol, side, amount, price, pnl):
+    try:
+        trade_entry = {
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'symbol': symbol,
+            'side': side,
+            'amount': amount,
+            'price': price,
+            'pnl': pnl
+        }
+        with open(self.trades_log, 'a') as f:
+            json.dump(trade_entry, f)
+            f.write('\n')  # Correction de l'indentation
 
-            logging.info(f"Trade enregistré : {trade_entry}")
-        except Exception as e:
-            logging.error(f"Erreur lors de la journalisation du trade : {e}")
+        logging.info(f"Trade enregistré : {trade_entry}")
+    except Exception as e:
+        logging.error(f"Erreur lors de la journalisation du trade : {e}")
 
 trade_manager = TradeManager()
 
