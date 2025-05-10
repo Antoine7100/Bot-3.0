@@ -30,6 +30,23 @@ nb_trades = 0
 tp_percentage = 0.02  # 2% de gain
 sl_percentage = 0.01  # 1% de perte
 
+# Fonction de test rapide pour vérifier la prise d'ordre
+@app.route('/test_order')
+def test_order():
+    try:
+        symbol = 'DOGE/USDT'
+        side = 'buy'
+        amount = 1
+        order = exchange.create_order(symbol, 'market', side, amount)
+        message = f'✅ Test réussi: Ordre {side} de {amount} {symbol} exécuté avec succès.'
+        send_telegram_message(message)
+        return jsonify({'status': 'success', 'message': message}), 200
+    except Exception as e:
+        message = f'❌ Erreur lors du test de prise d'ordre: {e}'
+        send_telegram_message(message)
+        return jsonify({'status': 'error', 'message': message}), 500
+
+
 # Charger les données depuis les fichiers
 def load_data():
     global positions, trades, gains_pertes, nb_trades
@@ -185,29 +202,29 @@ def place_order(symbol, side, amount):
         return None
 
 
-# Fonction de trading en arrière-plan
+# Vérification des croisements pour prise de position
 def run_bot():
     while True:
-        for symbol in symbols:
+        for symbol in ['DOGE/USDT', 'ADA/USDT']:
             try:
                 data = get_ohlcv(symbol)
                 if data is None:
                     continue
-                sma10 = data['close'].rolling(window=short_window).mean().iloc[-1]
-                sma100 = data['close'].rolling(window=long_window).mean().iloc[-1]
-                previous_sma10 = data['close'].rolling(window=short_window).mean().iloc[-2]
-                previous_sma100 = data['close'].rolling(window=long_window).mean().iloc[-2]
+                sma10 = data['close'].rolling(window=10).mean().iloc[-1]
+                sma100 = data['close'].rolling(window=100).mean().iloc[-1]
+                previous_sma10 = data['close'].rolling(window=10).mean().iloc[-2]
+                previous_sma100 = data['close'].rolling(window=100).mean().iloc[-2]
                 if sma10 > sma100 and previous_sma10 <= previous_sma100:
-                    print(f"Croisement haussier détecté pour {symbol}")
-                    send_telegram_message(f"Croisement haussier détecté pour {symbol}")
-                    place_order(symbol, 'buy', 15 / len(symbols))
+                    print(f'Croisement haussier détecté pour {symbol}')
+                    send_telegram_message(f'Croisement haussier détecté pour {symbol}')
+                    place_order(symbol, 'buy', 15)
                 elif sma10 < sma100 and previous_sma10 >= previous_sma100:
-                    print(f"Croisement baissier détecté pour {symbol}")
-                    send_telegram_message(f"Croisement baissier détecté pour {symbol}")
-                    place_order(symbol, 'sell', 15 / len(symbols))
+                    print(f'Croisement baissier détecté pour {symbol}')
+                    send_telegram_message(f'Croisement baissier détecté pour {symbol}')
+                    place_order(symbol, 'sell', 15)
                 time.sleep(60)
             except Exception as e:
-                send_telegram_message(f"Erreur pendant la boucle de trading : {e}")
+                send_telegram_message(f'Erreur pendant la boucle de trading : {e}')
                 time.sleep(5)
 
 # Fonction pour surveiller les positions et fermer si TP ou SL atteint
