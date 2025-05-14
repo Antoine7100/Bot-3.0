@@ -146,7 +146,7 @@ class BotTrader:
         self.notifier = TelegramNotifier()
         self.check_api_connection()
 
-                def check_api_connection(self):
+    def check_api_connection(self):
         try:
             balance = self.exchange.fetch_balance()
             logging.info("✅ API Bybit connectée avec succès.")
