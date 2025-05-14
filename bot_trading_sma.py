@@ -252,22 +252,25 @@ class BotTrader:
 
                     logging.info(f"✅ SMA10: {sma10}, SMA100: {sma100}, RSI: {current_rsi}")
 
-                    # Stratégie agressive SMA + RSI
-                    if sma10 > sma100 and current_rsi < 50:
-                        logging.info(f"🚀 Signal agressif d'achat pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
-                        notifier.send_message(f"🚀 Signal d'achat pour {symbol}", '📈')
-                        self.place_order(symbol, 'buy', self.trade_amount)
-                    elif sma10 < sma100 and current_rsi > 50:
-                        logging.info(f"🔻 Signal agressif de vente pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
-                        notifier.send_message(f"🔻 Signal de vente pour {symbol}", '📉')
-                        self.place_order(symbol, 'sell', self.trade_amount)
+                    # Vérification des conditions de trading
+                    if sma10 > sma100 and current_rsi < 60:
+                        logging.info(f"🚀 Signal d'achat détecté pour {symbol} avec SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
+                        self.notifier.send_message(f"🚀 Signal d'achat pour {symbol} avec SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}", '📈')
+                        order = self.place_order(symbol, 'buy', self.trade_amount)
+                        logging.info(f"✅ Ordre d'achat exécuté : {order}")
+                    elif sma10 < sma100 and current_rsi > 40:
+                        logging.info(f"🔻 Signal de vente détecté pour {symbol} avec SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
+                        self.notifier.send_message(f"🔻 Signal de vente pour {symbol} avec SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}", '📉')
+                        order = self.place_order(symbol, 'sell', self.trade_amount)
+                        logging.info(f"✅ Ordre de vente exécuté : {order}")
                     else:
-                        logging.info(f"🔍 Aucun signal détecté pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
+                        logging.info(f"🔍 Aucun signal de trading pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
 
                 except Exception as e:
-                    logging.error(f"Erreur lors de la récupération des données pour {symbol} : {e}")
+                    logging.error(f"❗ Erreur lors de la récupération des données pour {symbol} : {e}")
                     self.notifier.send_message(f"⚠️ Erreur lors de la récupération des données pour {symbol}", '❗')
                 time.sleep(30)
+
 
 
     def send_menu(self):
