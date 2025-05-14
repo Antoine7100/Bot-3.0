@@ -143,6 +143,19 @@ class BotTrader:
         self.daily_loss_limit = 100
         self.daily_loss = 0
         self.current_day = time.strftime('%Y-%m-%d')
+        self.notifier = TelegramNotifier()
+        self.check_api_connection()
+
+    def check_api_connection(self):
+        try:
+            balance = self.exchange.fetch_balance()
+            logging.info("✅ API Bybit connectée avec succès.")
+        except Exception as e:
+            logging.error(f"❗ Erreur de connexion API Bybit : {e}")
+            self.notifier.send_message("❗ Erreur de connexion API Bybit", '⚠️')
+
+    def log_signal_check(self, symbol, sma10, sma100, rsi):
+    logging.info(f"🔍 Vérification du signal pour {symbol} : SMA10={sma10}, SMA100={sma100}, RSI={rsi}")
 
     def start_bot(self):
         self.is_running = True
@@ -234,6 +247,8 @@ class BotTrader:
                     rsi = 100 - (100 / (1 + rs))
                     current_rsi = rsi.iloc[-1]
 
+                      self.log_signal_check(symbol, sma10, sma100, current_rsi)
+
                     logging.info(f"✅ SMA10: {sma10}, SMA100: {sma100}, RSI: {current_rsi}")
 
                     # Stratégie agressive SMA + RSI
@@ -249,7 +264,8 @@ class BotTrader:
                         logging.info(f"🔍 Aucun signal détecté pour {symbol}: SMA10={sma10}, SMA100={sma100}, RSI={current_rsi}")
 
                 except Exception as e:
-                    logging.error(f"Erreur lors de la récupération des données : {e}")
+                    logging.error(f"Erreur lors de la récupération des données pour {symbol} : {e}")
+self.notifier.send_message(f"⚠️ Erreur lors de la récupération des données pour {symbol}", '❗')
                 time.sleep(30)
 
     def send_menu(self):
