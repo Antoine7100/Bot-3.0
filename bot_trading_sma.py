@@ -132,7 +132,7 @@ class BotTrader:
         return True
 
 class BotTrader:
-    def __init__(self):
+  def __init__(self):
         self.exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
         self.symbols = ['DOGE/USDT', 'ADA/USDT']
         self.timeframe = '5m'
@@ -146,7 +146,7 @@ class BotTrader:
         self.notifier = TelegramNotifier()
         self.check_api_connection()
 
-    def check_api_connection(self):
+                def check_api_connection(self):
         try:
             balance = self.exchange.fetch_balance()
             logging.info("✅ API Bybit connectée avec succès.")
@@ -230,7 +230,7 @@ class BotTrader:
             notifier.send_message(f"❗ Erreur lors du passage d'ordre pour {symbol}: {e}", '⚠️')
             return None
 
-    def run_bot(self):
+   def run_bot(self):
         while self.is_running:
             for symbol in self.symbols:
                 try:
