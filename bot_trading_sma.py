@@ -154,6 +154,7 @@ class BotTrader:
             logging.error(f"❗ Erreur de connexion API Bybit : {e}")
             self.notifier.send_message("❗ Erreur de connexion API Bybit", '⚠️')
 
+
     def log_signal_check(self, symbol, sma10, sma100, rsi):
         logging.info(f"🔍 Vérification du signal pour {symbol} : SMA10={sma10}, SMA100={sma100}, RSI={rsi}")
         
