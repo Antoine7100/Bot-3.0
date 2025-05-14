@@ -231,7 +231,7 @@ class BotTrader:
             notifier.send_message(f"❗ Erreur lors du passage d'ordre pour {symbol}: {e}", '⚠️')
             return None
 
-def run_bot(self):
+ def run_bot(self):
         while self.is_running:
             for symbol in self.symbols:
                 try:
@@ -248,7 +248,7 @@ def run_bot(self):
                     rsi = 100 - (100 / (1 + rs))
                     current_rsi = rsi.iloc[-1]
 
-                      self.log_signal_check(symbol, sma10, sma100, current_rsi)
+                    self.log_signal_check(symbol, sma10, sma100, current_rsi)
 
                     logging.info(f"✅ SMA10: {sma10}, SMA100: {sma100}, RSI: {current_rsi}")
 
@@ -266,8 +266,9 @@ def run_bot(self):
 
                 except Exception as e:
                     logging.error(f"Erreur lors de la récupération des données pour {symbol} : {e}")
-self.notifier.send_message(f"⚠️ Erreur lors de la récupération des données pour {symbol}", '❗')
+                    self.notifier.send_message(f"⚠️ Erreur lors de la récupération des données pour {symbol}", '❗')
                 time.sleep(30)
+
 
     def send_menu(self):
         keyboard = [[
