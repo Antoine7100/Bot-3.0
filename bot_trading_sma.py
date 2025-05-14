@@ -231,7 +231,7 @@ class BotTrader:
             notifier.send_message(f"❗ Erreur lors du passage d'ordre pour {symbol}: {e}", '⚠️')
             return None
 
-   def run_bot(self):
+def run_bot(self):
         while self.is_running:
             for symbol in self.symbols:
                 try:
