@@ -160,7 +160,8 @@ class BotTrader:
         
     def start_bot(self):
         self.is_running = True
-        notifier.send_message("🚦 Bot démarré via Telegram.", '✅')
+        logging.info("🚦 Bot démarré via Telegram.")
+        notifier.send_message("🚦 Bot démarré avec succès!", '✅')
 
     def stop_bot(self):
         self.is_running = False
@@ -231,6 +232,7 @@ class BotTrader:
             notifier.send_message(f"❗ Erreur lors du passage d'ordre pour {symbol}: {e}", '⚠️')
             return None
 
+  
     def run_bot(self):
         if not self.is_running:
             logging.info("🚫 Le bot n'est pas en cours d'exécution. Aucun trade ne sera pris.")
@@ -239,6 +241,7 @@ class BotTrader:
         while self.is_running:
             logging.info("🔄 Nouvelle itération de prise de décision.")
             for symbol in self.symbols:
+                logging.info(f"🔍 Vérification du symbole : {symbol}")
                 try:
                     data = self.exchange.fetch_ohlcv(symbol, self.timeframe)
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
