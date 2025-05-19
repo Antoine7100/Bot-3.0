@@ -164,7 +164,7 @@ class BotTrader:
 
     def stop_bot(self):
         self.is_running = False
-        notifier.send_message("🛑 Bot arrêté via Telegram.", '❌'))
+        notifier.send_message("🛑 Bot arrêté via Telegram.", '❌')
 
     def change_trade_amount(self, amount):
         self.trade_amount = amount
