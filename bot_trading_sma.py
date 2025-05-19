@@ -135,7 +135,7 @@ class BotTrader:
     def __init__(self):
         self.exchange = ccxt.bybit({'apiKey': os.getenv('BYBIT_API_KEY'), 'secret': os.getenv('BYBIT_API_SECRET')})
         self.symbols = ['DOGE/USDT', 'ADA/USDT']
-        self.timeframe = '5m'
+        self.timeframe = '1m'
         self.tp_percentage = 0.02
         self.sl_percentage = 0.01
         self.trade_amount = 5
@@ -144,8 +144,7 @@ class BotTrader:
         self.daily_loss = 0
         self.current_day = time.strftime('%Y-%m-%d')
         self.notifier = TelegramNotifier()
-        self.check_api_connection()
-
+        
     def check_api_connection(self):
         try:
             balance = self.exchange.fetch_balance()
@@ -165,7 +164,7 @@ class BotTrader:
 
     def stop_bot(self):
         self.is_running = False
-        notifier.send_message("🛑 Bot arrêté via Telegram.", '❌')
+        notifier.send_message("🛑 Bot arrêté via Telegram.", '❌'))
 
     def change_trade_amount(self, amount):
         self.trade_amount = amount
@@ -261,20 +260,20 @@ class BotTrader:
                     logging.info(f"✅ Vérification des conditions pour {symbol} : SMA5={sma5}, SMA50={sma50}, RSI={current_rsi}")
                     
                     # Vérification des conditions de trading
-                    if sma10 > sma100:
-                        logging.info(f"🔄 Achat potentiel : SMA10={sma10} est supérieur à SMA100={sma100}")
+                    if sma5 > sma50:
+                        logging.info(f"🔄 Achat potentiel : SMA5={sma5} est supérieur à SMA50={sma50}")
                     else:
-                        logging.info(f"❌ Pas d'achat : SMA10={sma10} n'est pas supérieur à SMA100={sma100}")
+                        logging.info(f"❌ Pas d'achat : SMA5={sma5} n'est pas supérieur à SMA50={sma50}")
 
                     if current_rsi < 70:
                         logging.info(f"🔄 Achat potentiel : RSI={current_rsi} est inférieur à 70")
                     else:
                         logging.info(f"❌ Pas d'achat : RSI={current_rsi} n'est pas inférieur à 70")
 
-                    if sma10 < sma100:
-                        logging.info(f"🔄 Vente potentielle : SMA10={sma10} est inférieur à SMA100={sma100}")
+                    if sma5 < sma50:
+                        logging.info(f"🔄 Vente potentielle : SMA5={sma5} est inférieur à SMA50={sma50}")
                     else:
-                        logging.info(f"❌ Pas de vente : SMA10={sma10} n'est pas inférieur à SMA100={sma100}")
+                        logging.info(f"❌ Pas de vente : SMA5={sma5} n'est pas inférieur à SMA50={sma50}")
 
                     if current_rsi > 30:
                         logging.info(f"🔄 Vente potentielle : RSI={current_rsi} est supérieur à 30")
@@ -299,10 +298,6 @@ class BotTrader:
                     logging.error(f"❗ Erreur lors de la récupération des données pour {symbol} : {e}")
                     self.notifier.send_message(f"⚠️ Erreur lors de la récupération des données pour {symbol}", '❗')
                 time.sleep(10)
-
-
-
-
 
 
     def send_menu(self):
