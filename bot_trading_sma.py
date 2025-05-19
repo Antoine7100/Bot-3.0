@@ -275,12 +275,16 @@ class BotTrader:
                         order = self.place_order(symbol, 'buy', self.trade_amount)
                         if order:
                             logging.info(f"✅ Ordre d'achat exécuté : {order}")
+                        else:
+                            logging.error(f"❗ Échec de la prise de position d'achat pour {symbol}")
                     elif sma5 < sma50 and current_rsi > 35:
                         logging.info(f"🔻 Signal de vente pour {symbol}: SMA5={sma5}, SMA50={sma50}, RSI={current_rsi}")
                         self.notifier.send_message(f"🔻 Signal de vente pour {symbol}", '📉')
                         order = self.place_order(symbol, 'sell', self.trade_amount)
                         if order:
                             logging.info(f"✅ Ordre de vente exécuté : {order}")
+                        else:
+                            logging.error(f"❗ Échec de la prise de position de vente pour {symbol}")
                     else:
                         logging.info(f"🔍 Aucun signal détecté pour {symbol}: SMA5={sma5}, SMA50={sma50}, RSI={current_rsi}")
 
@@ -288,7 +292,7 @@ class BotTrader:
                     logging.error(f"❗ Erreur lors de la récupération des données pour {symbol} : {e}")
                     self.notifier.send_message(f"⚠️ Erreur lors de la récupération des données pour {symbol}", '❗')
                 time.sleep(60)
-
+                
     def send_menu(self):
         keyboard = [[
             InlineKeyboardButton("Démarrer", callback_data='/start'),
