@@ -230,9 +230,11 @@ class BotTrader:
             logging.error(f"❗ Erreur lors du passage d'ordre pour {symbol}: {e}")
             notifier.send_message(f"❗ Erreur lors du passage d'ordre pour {symbol}: {e}", '⚠️')
             return None
-
+        except Exception as e:
+            logging.error(f"❗ Erreur lors de la prise de position pour {symbol}: {e}")
+            return None
   
-    def run_bot(self):
+   def run_bot(self):
         if not self.is_running:
             logging.info("🚫 Le bot n'est pas en cours d'exécution. Aucun trade ne sera pris.")
             return
@@ -244,6 +246,9 @@ class BotTrader:
                 try:
                     data = self.exchange.fetch_ohlcv(symbol, '1m')
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    if len(df) < 50:
+                        logging.warning(f"⚠️ Pas assez de données pour calculer les indicateurs pour {symbol}")
+                        continue
                     sma5 = df['close'].rolling(window=5).mean().iloc[-1]
                     sma50 = df['close'].rolling(window=50).mean().iloc[-1]
 
@@ -255,50 +260,34 @@ class BotTrader:
                     rsi = 100 - (100 / (1 + rs))
                     current_rsi = rsi.iloc[-1]
 
+                    # Vérification des valeurs NaN
+                    if pd.isna(sma5) or pd.isna(sma50) or pd.isna(current_rsi):
+                        logging.warning(f"⚠️ Indicateurs non valides pour {symbol}")
+                        continue
+
                     self.log_signal_check(symbol, sma5, sma50, current_rsi)
-
                     logging.info(f"✅ Vérification des conditions pour {symbol} : SMA5={sma5}, SMA50={sma50}, RSI={current_rsi}")
-                    
-                    # Vérification des conditions de trading
-                    if sma5 > sma50:
-                        logging.info(f"🔄 Achat potentiel : SMA5={sma5} est supérieur à SMA50={sma50}")
-                    else:
-                        logging.info(f"❌ Pas d'achat : SMA5={sma5} n'est pas supérieur à SMA50={sma50}")
 
-                    if current_rsi < 70:
-                        logging.info(f"🔄 Achat potentiel : RSI={current_rsi} est inférieur à 70")
-                    else:
-                        logging.info(f"❌ Pas d'achat : RSI={current_rsi} n'est pas inférieur à 70")
-
-                    if sma5 < sma50:
-                        logging.info(f"🔄 Vente potentielle : SMA5={sma5} est inférieur à SMA50={sma50}")
-                    else:
-                        logging.info(f"❌ Pas de vente : SMA5={sma5} n'est pas inférieur à SMA50={sma50}")
-
-                    if current_rsi > 30:
-                        logging.info(f"🔄 Vente potentielle : RSI={current_rsi} est supérieur à 30")
-                    else:
-                        logging.info(f"❌ Pas de vente : RSI={current_rsi} n'est pas supérieur à 30")
-
-                   # Stratégie de scalping avec SMA + RSI
+                    # Stratégie de scalping avec SMA + RSI
                     if sma5 > sma50 and current_rsi < 65:
                         logging.info(f"🚀 Signal d'achat pour {symbol}: SMA5={sma5}, SMA50={sma50}, RSI={current_rsi}")
                         self.notifier.send_message(f"🚀 Signal d'achat pour {symbol}", '📈')
                         order = self.place_order(symbol, 'buy', self.trade_amount)
-                        logging.info(f"✅ Ordre d'achat exécuté : {order}")
+                        if order:
+                            logging.info(f"✅ Ordre d'achat exécuté : {order}")
                     elif sma5 < sma50 and current_rsi > 35:
                         logging.info(f"🔻 Signal de vente pour {symbol}: SMA5={sma5}, SMA50={sma50}, RSI={current_rsi}")
                         self.notifier.send_message(f"🔻 Signal de vente pour {symbol}", '📉')
                         order = self.place_order(symbol, 'sell', self.trade_amount)
-                        logging.info(f"✅ Ordre de vente exécuté : {order}")
+                        if order:
+                            logging.info(f"✅ Ordre de vente exécuté : {order}")
                     else:
                         logging.info(f"🔍 Aucun signal détecté pour {symbol}: SMA5={sma5}, SMA50={sma50}, RSI={current_rsi}")
 
                 except Exception as e:
                     logging.error(f"❗ Erreur lors de la récupération des données pour {symbol} : {e}")
                     self.notifier.send_message(f"⚠️ Erreur lors de la récupération des données pour {symbol}", '❗')
-                time.sleep(10)
-
+                time.sleep(60)
 
     def send_menu(self):
         keyboard = [[
