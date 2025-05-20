@@ -234,7 +234,7 @@ class BotTrader:
             logging.error(f"❗ Erreur lors de la prise de position pour {symbol}: {e}")
             return None
   
-def run_bot(self):
+   def run_bot(self):
         if not self.is_running:
             logging.info("🚫 Le bot n'est pas en cours d'exécution. Aucun trade ne sera pris.")
             return
