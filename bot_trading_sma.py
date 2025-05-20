@@ -292,7 +292,7 @@ def run_bot(self):
                     self.notifier.send_message(f"⚠️ Erreur données {symbol} : {e}", '❗')
                 time.sleep(5)
 
-   def send_menu(self):
+    def send_menu(self):
         keyboard = [[
             InlineKeyboardButton("Démarrer", callback_data='/start'),
             InlineKeyboardButton("Arrêter", callback_data='/stop')
