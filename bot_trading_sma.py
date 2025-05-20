@@ -234,10 +234,11 @@ class BotTrader:
             logging.error(f"❗ Erreur lors de la prise de position pour {symbol}: {e}")
             return None
   
-    def run_bot(self):
+def run_bot(self):
         if not self.is_running:
             logging.info("🚫 Le bot n'est pas en cours d'exécution. Aucun trade ne sera pris.")
             return
+
         logging.info("🚀 Le bot de trading est actif et en cours d'exécution.")
         while self.is_running:
             logging.info("🔄 Nouvelle itération de prise de décision.")
@@ -249,10 +250,10 @@ class BotTrader:
                     if len(df) < 20:
                         logging.warning(f"⚠️ Pas assez de données pour calculer les indicateurs pour {symbol}")
                         continue
+
                     sma3 = df['close'].rolling(window=3).mean().iloc[-1]
                     sma20 = df['close'].rolling(window=20).mean().iloc[-1]
 
-                    # Calcul du RSI sur 5 périodes
                     delta = df['close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=5).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=5).mean()
@@ -260,7 +261,6 @@ class BotTrader:
                     rsi = 100 - (100 / (1 + rs))
                     current_rsi = rsi.iloc[-1]
 
-                    # Vérification des valeurs NaN
                     if pd.isna(sma3) or pd.isna(sma20) or pd.isna(current_rsi):
                         logging.warning(f"⚠️ Indicateurs non valides pour {symbol}")
                         continue
@@ -268,18 +268,18 @@ class BotTrader:
                     self.log_signal_check(symbol, sma3, sma20, current_rsi)
                     logging.info(f"✅ Vérification des conditions pour {symbol} : SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
 
-                    # Vérification de la stratégie de scalping avec SMA + RSI
-                    if sma3 > sma20 and current_rsi < 70:
-                        logging.info(f"🚀 Signal d'achat pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
-                        self.notifier.send_message(f"🚀 Signal d'achat pour {symbol}", '📈')
+                    # Mode test agressif (assoupli les conditions pour assurer l'exécution)
+                    if sma3 > sma20 or current_rsi < 70:
+                        logging.info(f"🚀 Signal d'achat agressif pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
+                        self.notifier.send_message(f"🚀 Achat pour {symbol} SMA3={sma3:.4f} > SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📈')
                         order = self.place_order(symbol, 'buy', self.trade_amount)
                         if order:
                             logging.info(f"✅ Ordre d'achat exécuté : {order}")
                         else:
                             logging.error(f"❗ Échec de la prise de position d'achat pour {symbol}")
-                    elif sma3 < sma20 and current_rsi > 30:
-                        logging.info(f"🔻 Signal de vente pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
-                        self.notifier.send_message(f"🔻 Signal de vente pour {symbol}", '📉')
+                    elif sma3 < sma20 or current_rsi > 30:
+                        logging.info(f"🔻 Signal de vente agressif pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
+                        self.notifier.send_message(f"🔻 Vente pour {symbol} SMA3={sma3:.4f} < SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📉')
                         order = self.place_order(symbol, 'sell', self.trade_amount)
                         if order:
                             logging.info(f"✅ Ordre de vente exécuté : {order}")
@@ -290,10 +290,9 @@ class BotTrader:
 
                 except Exception as e:
                     logging.error(f"❗ Erreur lors de la récupération des données pour {symbol} : {e}")
-                    self.notifier.send_message(f"⚠️ Erreur lors de la récupération des données pour {symbol}", '❗')
-                time.sleep(10)
+                    self.notifier.send_message(f"⚠️ Erreur données {symbol} : {e}", '❗')
+                time.sleep(5)
 
-                
     def send_menu(self):
         keyboard = [[
             InlineKeyboardButton("Démarrer", callback_data='/start'),
