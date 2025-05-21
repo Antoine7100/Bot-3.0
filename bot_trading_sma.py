@@ -267,29 +267,41 @@ def run_bot(self):
                 self.log_signal_check(symbol, sma3, sma20, current_rsi)
                 logging.info(f"✅ Vérification des conditions pour {symbol} : SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
 
-                # Mode test agressif (assoupli les conditions pour assurer l'exécution)
                 if sma3 > sma20 or current_rsi < 70:
                     logging.info(f"🚀 Signal d'achat agressif pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
-                    self.notifier.send_message(f"🚀 Achat pour {symbol} SMA3={sma3:.4f} > SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📈')
+                    try:
+                        self.notifier.send_message(f"🚀 Achat pour {symbol} SMA3={sma3:.4f} > SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📈')
+                    except Exception as e:
+                        logging.error(f"Erreur Telegram Achat: {e}")
                     order = self.place_order(symbol, 'buy', self.trade_amount)
+                    logging.debug(f"🧾 Réponse à l'achat : {order}")
                     if order:
                         logging.info(f"✅ Ordre d'achat exécuté : {order}")
                     else:
                         logging.error(f"❗ Échec de la prise de position d'achat pour {symbol}")
+
                 elif sma3 < sma20 or current_rsi > 30:
                     logging.info(f"🔻 Signal de vente agressif pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
-                    self.notifier.send_message(f"🔻 Vente pour {symbol} SMA3={sma3:.4f} < SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📉')
+                    try:
+                        self.notifier.send_message(f"🔻 Vente pour {symbol} SMA3={sma3:.4f} < SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📉')
+                    except Exception as e:
+                        logging.error(f"Erreur Telegram Vente: {e}")
                     order = self.place_order(symbol, 'sell', self.trade_amount)
+                    logging.debug(f"🧾 Réponse à la vente : {order}")
                     if order:
                         logging.info(f"✅ Ordre de vente exécuté : {order}")
                     else:
                         logging.error(f"❗ Échec de la prise de position de vente pour {symbol}")
+
                 else:
                     logging.info(f"🔍 Aucun signal détecté pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
 
             except Exception as e:
                 logging.error(f"❗ Erreur lors de la récupération des données pour {symbol} : {e}")
-                self.notifier.send_message(f"⚠️ Erreur données {symbol} : {e}", '❗')
+                try:
+                    self.notifier.send_message(f"⚠️ Erreur données {symbol} : {e}", '❗')
+                except Exception as err:
+                    logging.error(f"Erreur Telegram globale : {err}")
             time.sleep(5)
 
     def send_menu(self):
