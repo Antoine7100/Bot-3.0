@@ -234,63 +234,63 @@ class BotTrader:
             logging.error(f"❗ Erreur lors de la prise de position pour {symbol}: {e}")
             return None
 def run_bot(self):
-        if not self.is_running:
-            logging.info("🚫 Le bot n'est pas en cours d'exécution. Aucun trade ne sera pris.")
-            return
+    if not self.is_running:
+        logging.info("🚫 Le bot n'est pas en cours d'exécution. Aucun trade ne sera pris.")
+        return
 
-        logging.info("🚀 Le bot de trading est actif et en cours d'exécution.")
-        while self.is_running:
-            logging.info("🔄 Nouvelle itération de prise de décision.")
-            for symbol in self.symbols:
-                logging.info(f"🔍 Vérification du symbole : {symbol}")
-                try:
-                    data = self.exchange.fetch_ohlcv(symbol, '1m')
-                    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                    if len(df) < 20:
-                        logging.warning(f"⚠️ Pas assez de données pour calculer les indicateurs pour {symbol}")
-                        continue
+    logging.info("🚀 Le bot de trading est actif et en cours d'exécution.")
+    while self.is_running:
+        logging.info("🔄 Nouvelle itération de prise de décision.")
+        for symbol in self.symbols:
+            logging.info(f"🔍 Vérification du symbole : {symbol}")
+            try:
+                data = self.exchange.fetch_ohlcv(symbol, '1m')
+                df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                if len(df) < 20:
+                    logging.warning(f"⚠️ Pas assez de données pour calculer les indicateurs pour {symbol}")
+                    continue
 
-                    sma3 = df['close'].rolling(window=3).mean().iloc[-1]
-                    sma20 = df['close'].rolling(window=20).mean().iloc[-1]
+                sma3 = df['close'].rolling(window=3).mean().iloc[-1]
+                sma20 = df['close'].rolling(window=20).mean().iloc[-1]
 
-                    delta = df['close'].diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=5).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=5).mean()
-                    rs = gain / loss
-                    rsi = 100 - (100 / (1 + rs))
-                    current_rsi = rsi.iloc[-1]
+                delta = df['close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=5).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=5).mean()
+                rs = gain / loss
+                rsi = 100 - (100 / (1 + rs))
+                current_rsi = rsi.iloc[-1]
 
-                    if pd.isna(sma3) or pd.isna(sma20) or pd.isna(current_rsi):
-                        logging.warning(f"⚠️ Indicateurs non valides pour {symbol}")
-                        continue
+                if pd.isna(sma3) or pd.isna(sma20) or pd.isna(current_rsi):
+                    logging.warning(f"⚠️ Indicateurs non valides pour {symbol}")
+                    continue
 
-                    self.log_signal_check(symbol, sma3, sma20, current_rsi)
-                    logging.info(f"✅ Vérification des conditions pour {symbol} : SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
+                self.log_signal_check(symbol, sma3, sma20, current_rsi)
+                logging.info(f"✅ Vérification des conditions pour {symbol} : SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
 
-                    # Mode test agressif (assoupli les conditions pour assurer l'exécution)
-                    if sma3 > sma20 or current_rsi < 70:
-                        logging.info(f"🚀 Signal d'achat agressif pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
-                        self.notifier.send_message(f"🚀 Achat pour {symbol} SMA3={sma3:.4f} > SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📈')
-                        order = self.place_order(symbol, 'buy', self.trade_amount)
-                        if order:
-                            logging.info(f"✅ Ordre d'achat exécuté : {order}")
-                        else:
-                            logging.error(f"❗ Échec de la prise de position d'achat pour {symbol}")
-                    elif sma3 < sma20 or current_rsi > 30:
-                        logging.info(f"🔻 Signal de vente agressif pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
-                        self.notifier.send_message(f"🔻 Vente pour {symbol} SMA3={sma3:.4f} < SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📉')
-                        order = self.place_order(symbol, 'sell', self.trade_amount)
-                        if order:
-                            logging.info(f"✅ Ordre de vente exécuté : {order}")
-                        else:
-                            logging.error(f"❗ Échec de la prise de position de vente pour {symbol}")
+                # Mode test agressif (assoupli les conditions pour assurer l'exécution)
+                if sma3 > sma20 or current_rsi < 70:
+                    logging.info(f"🚀 Signal d'achat agressif pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
+                    self.notifier.send_message(f"🚀 Achat pour {symbol} SMA3={sma3:.4f} > SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📈')
+                    order = self.place_order(symbol, 'buy', self.trade_amount)
+                    if order:
+                        logging.info(f"✅ Ordre d'achat exécuté : {order}")
                     else:
-                        logging.info(f"🔍 Aucun signal détecté pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
+                        logging.error(f"❗ Échec de la prise de position d'achat pour {symbol}")
+                elif sma3 < sma20 or current_rsi > 30:
+                    logging.info(f"🔻 Signal de vente agressif pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
+                    self.notifier.send_message(f"🔻 Vente pour {symbol} SMA3={sma3:.4f} < SMA20={sma20:.4f}, RSI={current_rsi:.2f}", '📉')
+                    order = self.place_order(symbol, 'sell', self.trade_amount)
+                    if order:
+                        logging.info(f"✅ Ordre de vente exécuté : {order}")
+                    else:
+                        logging.error(f"❗ Échec de la prise de position de vente pour {symbol}")
+                else:
+                    logging.info(f"🔍 Aucun signal détecté pour {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={current_rsi}")
 
-                except Exception as e:
-                    logging.error(f"❗ Erreur lors de la récupération des données pour {symbol} : {e}")
-                    self.notifier.send_message(f"⚠️ Erreur données {symbol} : {e}", '❗')
-                time.sleep(5)
+            except Exception as e:
+                logging.error(f"❗ Erreur lors de la récupération des données pour {symbol} : {e}")
+                self.notifier.send_message(f"⚠️ Erreur données {symbol} : {e}", '❗')
+            time.sleep(5)
 
     def send_menu(self):
         keyboard = [[
