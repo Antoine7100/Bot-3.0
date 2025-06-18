@@ -75,7 +75,7 @@ class BotTrader:
         self.is_running = False
         self.notifier.send_message("🛑 Bot arrêté", '🔴')
 
-       def run_bot(self):
+    def run_bot(self):
         logging.info("🚀 Bot actif")
         while self.is_running:
             for symbol in self.symbols:
@@ -136,7 +136,7 @@ class BotTrader:
                 except Exception as e:
                     logging.error(f"Erreur monitor {pos['symbol']} : {e}")
 
-        def place_order(self, symbol, side, amount):
+    def place_order(self, symbol, side, amount):
         try:
             logging.info(f"📤 Envoi ordre {side.upper()} sur {symbol} avec {amount} USDT")
             order = self.exchange.create_order(symbol, 'market', side, amount)
