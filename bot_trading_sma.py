@@ -73,7 +73,7 @@ class BotTrader:
 
     def stop_bot(self):
         self.is_running = False
-        self.notifier.send_message("🛑 Bot arrêté", '🔴')
+        self.notifier.send_message("🔝 Bot arrêté", '🔴')
 
     def run_bot(self):
         logging.info("🚀 Bot actif")
@@ -99,9 +99,6 @@ class BotTrader:
 
                     logging.info(f"🔍 {symbol} - SMA3: {sma3:.4f}, SMA20: {sma20:.4f}, RSI: {current_rsi:.2f}")
 
-                    min_cost = self.exchange.markets[symbol]['limits']['cost']['min']
-                    logging.info(f"💰 Montant minimum pour {symbol} : {min_cost}")
-
                     if sma3 > sma20:
                         self.notifier.send_message(f"🚀 Test Achat {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📈')
                         self.place_order(symbol, 'buy', self.trade_amount)
@@ -113,8 +110,6 @@ class BotTrader:
                     logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
             time.sleep(5)
 
-
-
     def monitor_positions(self):
         while True:
             time.sleep(15)
@@ -122,15 +117,13 @@ class BotTrader:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
                     if (pos['side'] == 'buy' and last_price >= pos['tp']) or (pos['side'] == 'sell' and last_price <= pos['tp']):
-                        self.notifier.send_message(f"🎯 TP atteint pour {pos['symbol']} à {last_price}", '🎉')
+                        self.notifier.send_message(f"🌟 TP atteint pour {pos['symbol']} à {last_price}", '🎉')
                         self.positions.remove(pos)
-                        # Clôturer la position
                         closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
                         self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
                     elif (pos['side'] == 'buy' and last_price <= pos['sl']) or (pos['side'] == 'sell' and last_price >= pos['sl']):
                         self.notifier.send_message(f"🔻 SL atteint pour {pos['symbol']} à {last_price}", '❌')
                         self.positions.remove(pos)
-                        # Clôturer la position
                         closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
                         self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
                 except Exception as e:
@@ -152,11 +145,6 @@ class BotTrader:
                 f.write("\n")
         except Exception as e:
             logging.error(f"❌ Erreur order {symbol} : {e}")
-
-
-
-    def log_signal_check(self, symbol, sma3, sma20, rsi):
-        logging.info(f"🔍 Signal check {symbol}: SMA3={sma3}, SMA20={sma20}, RSI={rsi}")
 
     def handle_telegram_command(self, command):
         if command == '/start':
@@ -181,9 +169,8 @@ bot = BotTrader()
 
 @app.route('/')
 def status():
-    logging.info("📡 Ping reçu (UptimeRobot)")
+    logging.info("📱 Ping reçu (UptimeRobot)")
     return "Bot de trading opérationnel"
-
 
 @app.route('/telegram', methods=['POST'])
 def telegram_webhook():
@@ -198,3 +185,4 @@ def telegram_webhook():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
+
