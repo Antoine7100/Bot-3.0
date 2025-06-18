@@ -180,7 +180,9 @@ bot = BotTrader()
 
 @app.route('/')
 def status():
+    logging.info("📡 Ping reçu (UptimeRobot)")
     return "Bot de trading opérationnel"
+
 
 @app.route('/telegram', methods=['POST'])
 def telegram_webhook():
