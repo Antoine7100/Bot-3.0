@@ -75,44 +75,44 @@ class BotTrader:
         self.is_running = False
         self.notifier.send_message("🛑 Bot arrêté", '🔴')
 
-   def run_bot(self):
-    logging.info("🚀 Bot actif")
-    while self.is_running:
-        for symbol in self.symbols:
-            try:
-                data = self.exchange.fetch_ohlcv(symbol, '1m')
-                df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                if len(df) < 20:
-                    continue
+       def run_bot(self):
+        logging.info("🚀 Bot actif")
+        while self.is_running:
+            for symbol in self.symbols:
+                try:
+                    data = self.exchange.fetch_ohlcv(symbol, '1m')
+                    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    if len(df) < 20:
+                        continue
 
-                sma3 = df['close'].rolling(window=3).mean().iloc[-1]
-                sma20 = df['close'].rolling(window=20).mean().iloc[-1]
-                delta = df['close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=5).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=5).mean()
-                rs = gain / loss
-                rsi = 100 - (100 / (1 + rs))
-                current_rsi = rsi.iloc[-1]
+                    sma3 = df['close'].rolling(window=3).mean().iloc[-1]
+                    sma20 = df['close'].rolling(window=20).mean().iloc[-1]
+                    delta = df['close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=5).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=5).mean()
+                    rs = gain / loss
+                    rsi = 100 - (100 / (1 + rs))
+                    current_rsi = rsi.iloc[-1]
 
-                if pd.isna(sma3) or pd.isna(sma20) or pd.isna(current_rsi):
-                    continue
+                    if pd.isna(sma3) or pd.isna(sma20) or pd.isna(current_rsi):
+                        continue
 
-                logging.info(f"🔍 {symbol} - SMA3: {sma3:.4f}, SMA20: {sma20:.4f}, RSI: {current_rsi:.2f}")
+                    logging.info(f"🔍 {symbol} - SMA3: {sma3:.4f}, SMA20: {sma20:.4f}, RSI: {current_rsi:.2f}")
 
-                min_cost = self.exchange.markets[symbol]['limits']['cost']['min']
-                logging.info(f"💰 Montant minimum pour {symbol} : {min_cost}")
+                    min_cost = self.exchange.markets[symbol]['limits']['cost']['min']
+                    logging.info(f"💰 Montant minimum pour {symbol} : {min_cost}")
 
-                # CONDITIONS TEMPORAIREMENT ASSOUPLIES POUR TEST
-                if sma3 > sma20:
-                    self.notifier.send_message(f"🚀 Test Achat {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📈')
-                    self.place_order(symbol, 'buy', self.trade_amount)
-                elif sma3 < sma20:
-                    self.notifier.send_message(f"🔻 Test Vente {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📉')
-                    self.place_order(symbol, 'sell', self.trade_amount)
+                    if sma3 > sma20:
+                        self.notifier.send_message(f"🚀 Test Achat {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📈')
+                        self.place_order(symbol, 'buy', self.trade_amount)
+                    elif sma3 < sma20:
+                        self.notifier.send_message(f"🔻 Test Vente {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📉')
+                        self.place_order(symbol, 'sell', self.trade_amount)
 
-            except Exception as e:
-                logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
-        time.sleep(5)
+                except Exception as e:
+                    logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
+            time.sleep(5)
+
 
 
     def monitor_positions(self):
@@ -136,22 +136,23 @@ class BotTrader:
                 except Exception as e:
                     logging.error(f"Erreur monitor {pos['symbol']} : {e}")
 
-    def place_order(self, symbol, side, amount):
-    try:
-        logging.info(f"📤 Envoi ordre {side.upper()} sur {symbol} avec {amount} USDT")
-        order = self.exchange.create_order(symbol, 'market', side, amount)
-        logging.info(f"✅ Réponse de Bybit : {order}")
+        def place_order(self, symbol, side, amount):
+        try:
+            logging.info(f"📤 Envoi ordre {side.upper()} sur {symbol} avec {amount} USDT")
+            order = self.exchange.create_order(symbol, 'market', side, amount)
+            logging.info(f"✅ Réponse de Bybit : {order}")
 
-        price = order['price'] if 'price' in order else self.exchange.fetch_ticker(symbol)['last']
-        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+            price = order['price'] if 'price' in order else self.exchange.fetch_ticker(symbol)['last']
+            tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+            sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
 
-        self.positions.append({'symbol': symbol, 'side': side, 'tp': tp, 'sl': sl})
-        with open(self.trades_file, 'a') as f:
-            json.dump({"symbol": symbol, "side": side, "price": price, "tp": tp, "sl": sl}, f)
-            f.write("\n")
-    except Exception as e:
-        logging.error(f"❌ Erreur order {symbol} : {e}")
+            self.positions.append({'symbol': symbol, 'side': side, 'tp': tp, 'sl': sl})
+            with open(self.trades_file, 'a') as f:
+                json.dump({"symbol": symbol, "side": side, "price": price, "tp": tp, "sl": sl}, f)
+                f.write("\n")
+        except Exception as e:
+            logging.error(f"❌ Erreur order {symbol} : {e}")
+
 
 
     def log_signal_check(self, symbol, sma3, sma20, rsi):
