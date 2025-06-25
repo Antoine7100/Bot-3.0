@@ -71,7 +71,7 @@ class BotTrader:
         self.notifier.send_message("🚦 Le bot a bien été lancé et commence à analyser les marchés.", '🟢')
         Thread(target=self.run_bot, daemon=True).start()
         Thread(target=self.monitor_positions, daemon=True).start()
-    else:
+        else:
         self.notifier.send_message("⚠️ Le bot est déjà en marche.")
         
     def stop_bot(self):
