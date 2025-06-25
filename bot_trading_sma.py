@@ -65,7 +65,7 @@ class BotTrader:
         self.trades_file = 'trades_log.json'
 
     def start_bot(self):
-    if not self.is_running:
+        if not self.is_running:
         logging.info("✅ start_bot() appelé")
         self.is_running = True
         self.notifier.send_message("🚦 Le bot a bien été lancé et commence à analyser les marchés.", '🟢')
