@@ -65,12 +65,15 @@ class BotTrader:
         self.trades_file = 'trades_log.json'
 
     def start_bot(self):
-        if not self.is_running:
-            self.is_running = True
-            self.notifier.send_message("🚦 Bot démarré", '🟢')
-            Thread(target=self.run_bot, daemon=True).start()
-            Thread(target=self.monitor_positions, daemon=True).start()
-
+    if not self.is_running:
+        logging.info("✅ start_bot() appelé")
+        self.is_running = True
+        self.notifier.send_message("🚦 Le bot a bien été lancé et commence à analyser les marchés.", '🟢')
+        Thread(target=self.run_bot, daemon=True).start()
+        Thread(target=self.monitor_positions, daemon=True).start()
+    else:
+        self.notifier.send_message("⚠️ Le bot est déjà en marche.")
+        
     def stop_bot(self):
         self.is_running = False
         self.notifier.send_message("🔝 Bot arrêté", '🔴')
@@ -111,23 +114,33 @@ class BotTrader:
             time.sleep(5)
 
     def monitor_positions(self):
-        while True:
-            time.sleep(15)
-            for pos in self.positions[:]:
-                try:
-                    last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
-                    if (pos['side'] == 'buy' and last_price >= pos['tp']) or (pos['side'] == 'sell' and last_price <= pos['tp']):
-                        self.notifier.send_message(f"🌟 TP atteint pour {pos['symbol']} à {last_price}", '🎉')
-                        self.positions.remove(pos)
-                        closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
-                        self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
-                    elif (pos['side'] == 'buy' and last_price <= pos['sl']) or (pos['side'] == 'sell' and last_price >= pos['sl']):
-                        self.notifier.send_message(f"🔻 SL atteint pour {pos['symbol']} à {last_price}", '❌')
-                        self.positions.remove(pos)
-                        closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
-                        self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
-                except Exception as e:
-                    logging.error(f"Erreur monitor {pos['symbol']} : {e}")
+    while True:
+        time.sleep(15)
+        for pos in self.positions[:]:
+            try:
+                last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
+
+                if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
+                   (pos['side'] == 'sell' and last_price <= pos['tp']):
+                    message = f"🎯 TP atteint pour {pos['symbol']} à {last_price:.4f} ✅"
+                    emoji = '🎉'
+                    self.positions.remove(pos)
+                    closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
+                    self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
+                    self.notifier.send_message(message, emoji)
+
+                elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
+                     (pos['side'] == 'sell' and last_price >= pos['sl']):
+                    message = f"❌ SL atteint pour {pos['symbol']} à {last_price:.4f} ⚠️"
+                    emoji = '⚠️'
+                    self.positions.remove(pos)
+                    closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
+                    self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
+                    self.notifier.send_message(message, emoji)
+
+            except Exception as e:
+                logging.error(f"Erreur monitor {pos['symbol']} : {e}")
+
 
     def place_order(self, symbol, side, amount):
         try:
@@ -147,23 +160,42 @@ class BotTrader:
             logging.error(f"❌ Erreur order {symbol} : {e}")
 
     def handle_telegram_command(self, command):
-        if command == '/start':
-            self.start_bot()
-        elif command == '/stop':
-            self.stop_bot()
-        elif command == '/status':
-            status = "✅ En marche" if self.is_running else "❌ Arrêté"
-            self.notifier.send_message(f"Statut du bot : {status}", 'ℹ️')
-        elif command == '/increase':
-            self.trade_amount += 5
-            self.notifier.send_message(f"💵 Montant mis à jour : {self.trade_amount} USDT")
-        elif command == '/decrease':
-            self.trade_amount = max(1, self.trade_amount - 5)
-            self.notifier.send_message(f"💸 Montant mis à jour : {self.trade_amount} USDT")
-        elif command == '/menu':
-            self.notifier.send_menu()
+    if command == '/start':
+        self.start_bot()
+
+    elif command == '/stop':
+        self.stop_bot()
+
+    elif command == '/status':
+        status = "✅ En marche" if self.is_running else "❌ Arrêté"
+        positions_info = ""
+        if self.positions:
+            positions_info += "\n📊 Positions ouvertes :\n"
+            for pos in self.positions:
+                positions_info += f"• {pos['symbol']} ({pos['side']}) → TP: {pos['tp']:.4f}, SL: {pos['sl']:.4f}\n"
         else:
-            self.notifier.send_message("Commande non reconnue.", '❗')
+            positions_info += "\nAucune position ouverte."
+
+        message = f"""
+🔎 Statut du bot : {status}
+💼 Montant par trade : {self.trade_amount} USDT
+{positions_info}
+""".strip()
+        self.notifier.send_message(message, 'ℹ️')
+
+    elif command == '/increase':
+        self.trade_amount += 5
+        self.notifier.send_message(f"💵 Montant mis à jour : {self.trade_amount} USDT")
+
+    elif command == '/decrease':
+        self.trade_amount = max(1, self.trade_amount - 5)
+        self.notifier.send_message(f"💸 Montant mis à jour : {self.trade_amount} USDT")
+
+    elif command == '/menu':
+        self.notifier.send_menu()
+
+    else:
+        self.notifier.send_message("Commande non reconnue.", '❗')
 
 bot = BotTrader()
 
@@ -175,13 +207,17 @@ def status():
 @app.route('/telegram', methods=['POST'])
 def telegram_webhook():
     data = request.json
+    logging.info(f"📩 Reçu de Telegram : {json.dumps(data)}")  # ✅ log utile pour debug
+
     if 'message' in data and 'text' in data['message']:
         command = data['message']['text']
         bot.handle_telegram_command(command)
     elif 'callback_query' in data:
         command = data['callback_query']['data']
         bot.handle_telegram_command(command)
+
     return '', 200
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
