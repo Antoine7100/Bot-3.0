@@ -112,7 +112,7 @@ class BotTrader:
                 except Exception as e:
                     logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
             time.sleep(5)
-   def monitor_positions(self):
+    def monitor_positions(self):
         while True:
             time.sleep(15)
             for pos in self.positions[:]:
