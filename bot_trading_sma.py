@@ -114,8 +114,8 @@ class BotTrader:
             time.sleep(5)
 
     def monitor_positions(self):
-        while True:
-        time.sleep(15)
+       while True:
+            time.sleep(15)
         for pos in self.positions[:]:
             try:
                 last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
