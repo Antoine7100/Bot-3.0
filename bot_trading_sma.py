@@ -159,15 +159,15 @@ class BotTrader:
             logging.error(f"❌ Erreur order {symbol} : {e}")
 
     def handle_telegram_command(self, command):
-    if command == '/start':
-        self.start_bot()
+        if command == '/start':
+            self.start_bot()
 
-    elif command == '/stop':
-        self.stop_bot()
+        elif command == '/stop':
+            self.stop_bot()
 
-    elif command == '/status':
-        status = "✅ En marche" if self.is_running else "❌ Arrêté"
-        positions_info = ""
+        elif command == '/status':
+            status = "✅ En marche" if self.is_running else "❌ Arrêté"
+            positions_info = ""
         if self.positions:
             positions_info += "\n📊 Positions ouvertes :\n"
             for pos in self.positions:
