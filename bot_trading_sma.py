@@ -158,41 +158,43 @@ class BotTrader:
         except Exception as e:
             logging.error(f"❌ Erreur order {symbol} : {e}")
 
-def handle_telegram_command(self, command):
-    if command == '/start':
-        self.start_bot()
+   def handle_telegram_command(self, command):
+        if command == '/start':
+            self.start_bot()
 
-    elif command == '/stop':
-        self.stop_bot()
+        elif command == '/stop':
+            self.stop_bot()
 
-    elif command == '/status':
-        status = "✅ En marche" if self.is_running else "❌ Arrêté"
-        positions_info = ""
+        elif command == '/status':
+            status = "✅ En marche" if self.is_running else "❌ Arrêté"
+            positions_info = ""
+            if self.positions:
+                positions_info += "\n📊 Positions ouvertes :\n"
+                for pos in self.positions:
+                    positions_info += f"• {pos['symbol']} ({pos['side']}) → TP: {pos['tp']:.4f}, SL: {pos['sl']:.4f}\n"
+            else:
+                positions_info += "\nAucune position ouverte."
 
-        if self.positions:
-            positions_info += "\n📊 Positions ouvertes :\n"
-            for pos in self.positions:
-                positions_info += f"• {pos['symbol']} ({pos['side']}) → TP: {pos['tp']:.4f}, SL: {pos['sl']:.4f}\n"
-        else:
-            positions_info += "\nAucune position ouverte."
-
-        message = f"""
+            message = f"""
 🔎 Statut du bot : {status}
 💼 Montant par trade : {self.trade_amount} USDT
 {positions_info}
 """.strip()
-        self.notifier.send_message(message, 'ℹ️')
+            self.notifier.send_message(message, 'ℹ️')
 
-    elif command == '/increase':
-        self.trade_amount += 5
-        self.notifier.send_message(f"💵 Montant mis à jour : {self.trade_amount} USDT")
+        elif command == '/increase':
+            self.trade_amount += 5
+            self.notifier.send_message(f"💵 Montant mis à jour : {self.trade_amount} USDT")
 
-    elif command == '/decrease':
-        self.trade_amount = max(1, self.trade_amount - 5)
-        self.notifier.send_message(f"💸 Montant mis à jour : {self.trade_amount} USDT")
+        elif command == '/decrease':
+            self.trade_amount = max(1, self.trade_amount - 5)
+            self.notifier.send_message(f"💸 Montant mis à jour : {self.trade_amount} USDT")
 
-    elif command
+        elif command == '/menu':
+            self.notifier.send_menu()
 
+        else:
+            self.notifier.send_message("Commande non reconnue.", '❗')
 
 bot = BotTrader()
 
