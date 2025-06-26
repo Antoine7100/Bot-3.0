@@ -114,7 +114,7 @@ class BotTrader:
             time.sleep(5)
 
     def monitor_positions(self):
-    while True:
+        while True:
         time.sleep(15)
         for pos in self.positions[:]:
             try:
