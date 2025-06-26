@@ -158,16 +158,17 @@ class BotTrader:
         except Exception as e:
             logging.error(f"❌ Erreur order {symbol} : {e}")
 
-    def handle_telegram_command(self, command):
-        if command == '/start':
-            self.start_bot()
+def handle_telegram_command(self, command):
+    if command == '/start':
+        self.start_bot()
 
-        elif command == '/stop':
-            self.stop_bot()
+    elif command == '/stop':
+        self.stop_bot()
 
-        elif command == '/status':
-            status = "✅ En marche" if self.is_running else "❌ Arrêté"
-            positions_info = ""
+    elif command == '/status':
+        status = "✅ En marche" if self.is_running else "❌ Arrêté"
+        positions_info = ""
+
         if self.positions:
             positions_info += "\n📊 Positions ouvertes :\n"
             for pos in self.positions:
@@ -190,11 +191,8 @@ class BotTrader:
         self.trade_amount = max(1, self.trade_amount - 5)
         self.notifier.send_message(f"💸 Montant mis à jour : {self.trade_amount} USDT")
 
-    elif command == '/menu':
-        self.notifier.send_menu()
+    elif command
 
-    else:
-        self.notifier.send_message("Commande non reconnue.", '❗')
 
 bot = BotTrader()
 
