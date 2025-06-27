@@ -8,16 +8,10 @@ import json
 from threading import Thread
 from flask import Flask, request
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-import json
 
+# Chargement de la config
 with open("config.json") as f:
     config = json.load(f)
-
-# Exemple d'utilisation :
-api_key = config["api_key"]
-stake_amount = config["stake_amount"]
-tp_percentage = config["tp_percentage"]
-sl_percentage = config["sl_percentage"]
 
 # Configuration logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -57,10 +51,11 @@ class TelegramNotifier:
                 ]
             ]
         }
-        self.send_message("🛠️ Menu de contrôle du bot", '📋', reply_markup=keyboard)
+        self.send_message("🛠️ Menu de contrôle du bot", '🗌', reply_markup=keyboard)
 
 class BotTrader:
     def __init__(self):
+        # Connexion à Bybit via CCXT
         self.exchange = ccxt.bybit({
             'apiKey': os.getenv('BYBIT_API_KEY'),
             'secret': os.getenv('BYBIT_API_SECRET'),
@@ -68,14 +63,18 @@ class BotTrader:
                 'createMarketBuyOrderRequiresPrice': False
             }
         })
-        self.symbols = ['DOGE/USDT', 'ADA/USDT']
-        self.trade_amount = 5
+
+        # Données de configuration
+        self.symbols = [config["symbol"]]
+        self.trade_amount = config["stake_amount"]
+        self.tp_percentage = config["tp_percentage"]
+        self.sl_percentage = config["sl_percentage"]
+        self.trades_file = config["trades_file"]
+
+        # État du bot et outils
         self.is_running = False
         self.notifier = TelegramNotifier()
-        self.tp_percentage = 0.02
-        self.sl_percentage = 0.01
         self.positions = []
-        self.trades_file = 'trades_log.json'
 
     def start_bot(self):
         if not self.is_running:
@@ -100,7 +99,6 @@ class BotTrader:
         })
         self.exchange.create_order(symbol, 'market', side, self.trade_amount)
         self.notifier.send_message(f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌')
-
 
     def stop_bot(self):
         self.is_running = False
