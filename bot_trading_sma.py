@@ -88,7 +88,9 @@ class BotTrader:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
     def enter_trade(self, symbol, side='buy'):
         price = self.exchange.fetch_ticker(symbol)['last']
-        order_value = price * self.trade_amount
+        adjusted_amount = max(5 / price, self.trade_amount)
+        order_value = price * adjusted_amount
+
         if order_value < 5:
             logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
             self.notifier.send_message(f"❌ Montant trop faible pour {symbol} ({order_value:.2f} USDT). Ordre ignoré.", "⚠️")
@@ -96,7 +98,7 @@ class BotTrader:
 
         tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
         sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
-        trailing_sl = sl  # trailing stop initialisé avec le SL
+        trailing_sl = sl
 
         self.positions.append({
             'symbol': symbol,
@@ -107,7 +109,7 @@ class BotTrader:
             'trailing_sl': trailing_sl
         })
 
-        self.exchange.create_order(symbol, 'market', side, self.trade_amount)
+        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
         self.notifier.send_message(
             f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌'
         )
