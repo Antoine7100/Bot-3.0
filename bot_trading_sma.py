@@ -152,16 +152,16 @@ class BotTrader:
 
                     logging.info(f"🔍 {symbol} - SMA3: {sma3:.4f}, SMA20: {sma20:.4f}, RSI: {current_rsi:.2f}")
 
-                    if sma3 > sma20:
-                        self.notifier.send_message(f"🚀 Test Achat {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📈')
-                        self.enter_trade(symbol)
-                    elif sma3 < sma20:
-                        self.notifier.send_message(f"🔻 Test Vente {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📉')
+                    # NOUVELLE CONDITION : agressive mais filtrée
+                    if sma3 > sma20 and current_rsi < 70:
+                        self.enter_trade(symbol, side='buy')
+                    elif sma3 < sma20 and current_rsi > 30:
                         self.enter_trade(symbol, side='sell')
 
                 except Exception as e:
                     logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
             time.sleep(30)
+
 
     def monitor_positions(self):
         while self.is_running:
