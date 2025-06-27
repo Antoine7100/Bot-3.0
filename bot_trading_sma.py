@@ -77,7 +77,7 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
 
-     def enter_trade(self, symbol, side='buy'):
+    def enter_trade(self, symbol, side='buy'):
         price = self.exchange.fetch_ticker(symbol)['last']
         tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
         sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
