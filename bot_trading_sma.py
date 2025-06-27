@@ -134,15 +134,14 @@ class BotTrader:
                     logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
             time.sleep(30)
     def monitor_positions(self):
-        while True:
-            time.sleep(15)
+        while self.is_running:
             for pos in self.positions[:]:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
 
                     if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
                        (pos['side'] == 'sell' and last_price <= pos['tp']):
-                        message = f"🎯 TP atteint pour {pos['symbol']} à {last_price:.4f} ✅"
+                        message = f"🌟 TP atteint pour {pos['symbol']} à {last_price:.4f} ✅"
                         emoji = '🎉'
                         self.positions.remove(pos)
                         closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
@@ -160,6 +159,7 @@ class BotTrader:
 
                 except Exception as e:
                     logging.error(f"Erreur monitor {pos['symbol']} : {e}")
+            time.sleep(15)
 
 
     def place_order(self, symbol, side, amount):
