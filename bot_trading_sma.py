@@ -101,6 +101,7 @@ class BotTrader:
             'entry': price,
             'tp': tp,
             'sl': sl
+            'trailing_sl': sl  # ajout du trailing stop initial
         })
         self.exchange.create_order(symbol, 'market', side, self.trade_amount)
         self.notifier.send_message(f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌')
@@ -168,26 +169,38 @@ class BotTrader:
             for pos in self.positions[:]:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
-                    order_value = last_price * self.trade_amount
-                    if order_value < 5:
-                        logging.warning(f"❌ Vente ignorée pour {pos['symbol']} - montant trop faible ({order_value:.2f} USDT)")
-                        self.notifier.send_message(f"❌ Vente ignorée pour {pos['symbol']} ({order_value:.2f} USDT trop faible)", "⚠️")
-                        self.positions.remove(pos)
-                        continue
-                    if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
-                       (pos['side'] == 'sell' and last_price <= pos['tp']):
+                    side = pos['side']
+
+                    # Trailing stop : ajuste le SL si le prix évolue favorablement
+                    if side == 'buy' and last_price > pos['entry']:
+                        new_trailing_sl = last_price * (1 - self.sl_percentage)
+                        if new_trailing_sl > pos['trailing_sl']:
+                            pos['trailing_sl'] = new_trailing_sl
+                            logging.info(f"🔄 Trailing SL (BUY) ajusté pour {pos['symbol']} à {new_trailing_sl:.4f}")
+
+                    elif side == 'sell' and last_price < pos['entry']:
+                        new_trailing_sl = last_price * (1 + self.sl_percentage)
+                        if new_trailing_sl < pos['trailing_sl']:
+                            pos['trailing_sl'] = new_trailing_sl
+                            logging.info(f"🔄 Trailing SL (SELL) ajusté pour {pos['symbol']} à {new_trailing_sl:.4f}")
+
+                    # Take Profit
+                    if (side == 'buy' and last_price >= pos['tp']) or \
+                       (side == 'sell' and last_price <= pos['tp']):
                         message = f"🌟 TP atteint pour {pos['symbol']} à {last_price:.4f} ✅"
                         emoji = '🎉'
                         self.positions.remove(pos)
-                        closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
+                        closing_side = 'sell' if side == 'buy' else 'buy'
                         self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
                         self.notifier.send_message(message, emoji)
-                    elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
-                         (pos['side'] == 'sell' and last_price >= pos['sl']):
+
+                    # Stop Loss (utilise trailing_sl)
+                    elif (side == 'buy' and last_price <= pos['trailing_sl']) or \
+                         (side == 'sell' and last_price >= pos['trailing_sl']):
                         message = f"❌ SL atteint pour {pos['symbol']} à {last_price:.4f} ⚠️"
                         emoji = '⚠️'
                         self.positions.remove(pos)
-                        closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
+                        closing_side = 'sell' if side == 'buy' else 'buy'
                         self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
                         self.notifier.send_message(message, emoji)
                 except Exception as e:
@@ -237,7 +250,7 @@ class BotTrader:
             if self.positions:
                 positions_info += "\n📊 Positions ouvertes :\n"
                 for pos in self.positions:
-                    positions_info += f"• {pos['symbol']} ({pos['side']}) → TP: {pos['tp']:.4f}, SL: {pos['sl']:.4f}\n"
+                    positions_info += f"• {pos['symbol']} ({pos['side']}) → TP: {pos['tp']:.4f}, SL: {pos['trailing_sl']:.4f}\n"
             else:
                 positions_info += "\nAucune position ouverte."
 
