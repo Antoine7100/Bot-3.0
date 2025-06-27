@@ -1,11 +1,8 @@
 {
-  "api_key": "TA_CLE_BYBIT",
-  "api_secret": "TON_SECRET_BYBIT",
-  "stake_amount": 10,
-  "tp_percentage": 0.02,
-  "sl_percentage": 0.01,
   "symbol": "DOGE/USDT",
+  "stake_amount": 10,
+  "tp_percentage": 0.03,
+  "sl_percentage": 0.015,
   "leverage": 5,
-  "telegram_token": "TON_TELEGRAM_TOKEN",
-  "telegram_chat_id": "TON_CHAT_ID"
+  "trades_file": "trades.json"
 }
