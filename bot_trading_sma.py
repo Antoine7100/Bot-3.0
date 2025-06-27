@@ -77,6 +77,21 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
 
+     def enter_trade(self, symbol, side='buy'):
+        price = self.exchange.fetch_ticker(symbol)['last']
+        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+        self.positions.append({
+            'symbol': symbol,
+            'side': side,
+            'entry': price,
+            'tp': tp,
+            'sl': sl
+        })
+        self.exchange.create_order(symbol, 'market', side, self.trade_amount)
+        self.notifier.send_message(f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌')
+
+
     def stop_bot(self):
         self.is_running = False
         self.notifier.send_message("🔝 Bot arrêté", '🔴')
