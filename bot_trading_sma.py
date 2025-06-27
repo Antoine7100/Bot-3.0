@@ -87,19 +87,27 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
 
-    def enter_trade(self, symbol, side='buy'):
-        price = self.exchange.fetch_ticker(symbol)['last']
-        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
-        self.positions.append({
-            'symbol': symbol,
-            'side': side,
-            'entry': price,
-            'tp': tp,
-            'sl': sl
-        })
-        self.exchange.create_order(symbol, 'market', side, self.trade_amount)
-        self.notifier.send_message(f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌')
+def enter_trade(self, symbol, side='buy'):
+    price = self.exchange.fetch_ticker(symbol)['last']
+    order_value = price * self.trade_amount
+    min_order_usdt = 5
+    if order_value < min_order_usdt:
+        logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
+        self.notifier.send_message(f"❌ Montant trop faible pour {symbol} ({order_value:.2f} USDT). Ordre ignoré.", "⚠️")
+        return
+
+    tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+    sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+    self.positions.append({
+        'symbol': symbol,
+        'side': side,
+        'entry': price,
+        'tp': tp,
+        'sl': sl
+    })
+    self.exchange.create_order(symbol, 'market', side, self.trade_amount)
+    self.notifier.send_message(f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌')
+
 
     def stop_bot(self):
         self.is_running = False
