@@ -84,7 +84,10 @@ class BotTrader:
     def run_bot(self):
         logging.info("🚀 Bot actif")
         while self.is_running:
+            active_symbols = {pos['symbol'] for pos in self.positions}
             for symbol in self.symbols:
+                if symbol in active_symbols:
+                    continue  # Ne pas trader à nouveau ce symbole s'il a déjà une position ouverte
                 try:
                     data = self.exchange.fetch_ohlcv(symbol, '1m')
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -107,14 +110,14 @@ class BotTrader:
 
                     if sma3 > sma20:
                         self.notifier.send_message(f"🚀 Test Achat {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📈')
-                        self.place_order(symbol, 'buy', self.trade_amount)
+                        self.enter_trade(symbol)
                     elif sma3 < sma20:
                         self.notifier.send_message(f"🔻 Test Vente {symbol} SMA3={sma3:.4f}, RSI={current_rsi:.2f}", '📉')
-                        self.place_order(symbol, 'sell', self.trade_amount)
+                        self.enter_trade(symbol, side='sell')
 
                 except Exception as e:
                     logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
-            time.sleep(5)
+            time.sleep(30)
     def monitor_positions(self):
         while True:
             time.sleep(15)
