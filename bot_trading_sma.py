@@ -158,7 +158,7 @@ class BotTrader:
         except Exception as e:
             logging.error(f"❌ Erreur order {symbol} : {e}")
 
-   def handle_telegram_command(self, command):
+    def handle_telegram_command(self, command):
         if command == '/start':
             self.start_bot()
 
