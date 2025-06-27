@@ -100,7 +100,7 @@ class BotTrader:
             'side': side,
             'entry': price,
             'tp': tp,
-            'sl': sl
+            'sl': sl,
             'trailing_sl': sl  # ajout du trailing stop initial
         })
         self.exchange.create_order(symbol, 'market', side, self.trade_amount)
