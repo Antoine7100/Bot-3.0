@@ -8,6 +8,16 @@ import json
 from threading import Thread
 from flask import Flask, request
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+import json
+
+with open("config.json") as f:
+    config = json.load(f)
+
+# Exemple d'utilisation :
+api_key = config["api_key"]
+stake_amount = config["stake_amount"]
+tp_percentage = config["tp_percentage"]
+sl_percentage = config["sl_percentage"]
 
 # Configuration logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -161,23 +171,45 @@ class BotTrader:
                     logging.error(f"Erreur monitor {pos['symbol']} : {e}")
             time.sleep(15)
 
+        def place_order(self, symbol, side, amount):
+            try:
+                price = self.exchange.fetch_ticker(symbol)['last']
+                order_value = price * amount
+                min_order_usdt = 5  # valeur minimum imposée par Bybit
 
-    def place_order(self, symbol, side, amount):
-        try:
-            logging.info(f"📤 Envoi ordre {side.upper()} sur {symbol} avec {amount} USDT")
-            order = self.exchange.create_order(symbol, 'market', side, amount)
-            logging.info(f"✅ Réponse de Bybit : {order}")
+                if order_value < min_order_usdt:
+                    logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
+                    return
 
-            price = order['price'] if 'price' in order else self.exchange.fetch_ticker(symbol)['last']
-            tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-            sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+                logging.info(f"📤 Envoi ordre {side.upper()} sur {symbol} avec {amount} USDT")
+                order = self.exchange.create_order(symbol, 'market', side, amount)
+                logging.info(f"✅ Réponse de Bybit : {order}")
 
-            self.positions.append({'symbol': symbol, 'side': side, 'tp': tp, 'sl': sl})
-            with open(self.trades_file, 'a') as f:
-                json.dump({"symbol": symbol, "side": side, "price": price, "tp": tp, "sl": sl}, f)
-                f.write("\n")
-        except Exception as e:
-            logging.error(f"❌ Erreur order {symbol} : {e}")
+                # Sécurise le prix
+                price = order.get('price', price)
+
+                # Calcul TP et SL
+                tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+                sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+
+                # Sauvegarde la position
+                self.positions.append({'symbol': symbol, 'side': side, 'tp': tp, 'sl': sl})
+                with open(self.trades_file, 'a') as f:
+                    json.dump({"symbol": symbol, "side": side, "price": price, "tp": tp, "sl": sl}, f)
+                    f.write("\n")
+
+                # Notification Telegram si activée
+                self.notifier.send_message(
+                    f"✅ Nouvelle position {side.upper()} sur {symbol} à {price:.4f}\n🎯 TP: {tp:.4f} / 🛑 SL: {sl:.4f}",
+                    emoji="📌"
+                )
+
+            except Exception as e:
+                logging.error(f"❌ Erreur order {symbol} : {e}")
+                self.notifier.send_message(f"❌ Erreur ordre {symbol} : {e}", emoji="⚠️")
+
+
+
 
     def handle_telegram_command(self, command):
         if command == '/start':
