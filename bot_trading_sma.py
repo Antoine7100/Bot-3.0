@@ -48,14 +48,17 @@ class TelegramNotifier:
                     {"text": "Statut", "callback_data": "/status"},
                     {"text": "Montant +5 USDT", "callback_data": "/increase"},
                     {"text": "Montant -5 USDT", "callback_data": "/decrease"}
+                ],
+                [
+                    {"text": "Fermer positions", "callback_data": "/closeall"}
                 ]
             ]
         }
         self.send_message("🛠️ Menu de contrôle du bot", '🗌', reply_markup=keyboard)
 
+
 class BotTrader:
     def __init__(self):
-        # Connexion à Bybit via CCXT
         self.exchange = ccxt.bybit({
             'apiKey': os.getenv('BYBIT_API_KEY'),
             'secret': os.getenv('BYBIT_API_SECRET'),
@@ -64,14 +67,12 @@ class BotTrader:
             }
         })
 
-        # Données de configuration
         self.symbols = [config["symbol"]]
         self.trade_amount = config["stake_amount"]
         self.tp_percentage = config["tp_percentage"]
         self.sl_percentage = config["sl_percentage"]
         self.trades_file = config["trades_file"]
 
-        # État du bot et outils
         self.is_running = False
         self.notifier = TelegramNotifier()
         self.positions = []
@@ -104,13 +105,29 @@ class BotTrader:
         self.is_running = False
         self.notifier.send_message("🔝 Bot arrêté", '🔴')
 
+    def close_all_positions(self):
+        if not self.positions:
+            self.notifier.send_message("❗Aucune position à fermer.")
+            return
+
+        for pos in self.positions[:]:
+            try:
+                closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
+                self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
+                self.positions.remove(pos)
+                self.notifier.send_message(f"🔒 Fermeture manuelle de {pos['symbol']} ({pos['side']})")
+            except Exception as e:
+                logging.error(f"❌ Erreur fermeture {pos['symbol']} : {e}")
+                self.notifier.send_message(f"❌ Erreur fermeture {pos['symbol']} : {e}", '⚠️')
+
+
     def run_bot(self):
         logging.info("🚀 Bot actif")
         while self.is_running:
             active_symbols = {pos['symbol'] for pos in self.positions}
             for symbol in self.symbols:
                 if symbol in active_symbols:
-                    continue  # Ne pas trader à nouveau ce symbole s'il a déjà une position ouverte
+                    continue
                 try:
                     data = self.exchange.fetch_ohlcv(symbol, '1m')
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -141,6 +158,7 @@ class BotTrader:
                 except Exception as e:
                     logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
             time.sleep(30)
+
     def monitor_positions(self):
         while self.is_running:
             for pos in self.positions[:]:
@@ -169,53 +187,43 @@ class BotTrader:
                     logging.error(f"Erreur monitor {pos['symbol']} : {e}")
             time.sleep(15)
 
-        def place_order(self, symbol, side, amount):
-            try:
-                price = self.exchange.fetch_ticker(symbol)['last']
-                order_value = price * amount
-                min_order_usdt = 5  # valeur minimum imposée par Bybit
+    def place_order(self, symbol, side, amount):
+        try:
+            price = self.exchange.fetch_ticker(symbol)['last']
+            order_value = price * amount
+            min_order_usdt = 5
 
-                if order_value < min_order_usdt:
-                    logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
-                    return
+            if order_value < min_order_usdt:
+                logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
+                return
 
-                logging.info(f"📤 Envoi ordre {side.upper()} sur {symbol} avec {amount} USDT")
-                order = self.exchange.create_order(symbol, 'market', side, amount)
-                logging.info(f"✅ Réponse de Bybit : {order}")
+            logging.info(f"📤 Envoi ordre {side.upper()} sur {symbol} avec {amount} USDT")
+            order = self.exchange.create_order(symbol, 'market', side, amount)
+            logging.info(f"✅ Réponse de Bybit : {order}")
 
-                # Sécurise le prix
-                price = order.get('price', price)
+            price = order.get('price', price)
+            tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+            sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
 
-                # Calcul TP et SL
-                tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-                sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+            self.positions.append({'symbol': symbol, 'side': side, 'tp': tp, 'sl': sl})
+            with open(self.trades_file, 'a') as f:
+                json.dump({"symbol": symbol, "side": side, "price": price, "tp": tp, "sl": sl}, f)
+                f.write("\n")
 
-                # Sauvegarde la position
-                self.positions.append({'symbol': symbol, 'side': side, 'tp': tp, 'sl': sl})
-                with open(self.trades_file, 'a') as f:
-                    json.dump({"symbol": symbol, "side": side, "price": price, "tp": tp, "sl": sl}, f)
-                    f.write("\n")
+            self.notifier.send_message(
+                f"✅ Nouvelle position {side.upper()} sur {symbol} à {price:.4f}\n🎯 TP: {tp:.4f} / 🛑 SL: {sl:.4f}",
+                emoji="📌"
+            )
 
-                # Notification Telegram si activée
-                self.notifier.send_message(
-                    f"✅ Nouvelle position {side.upper()} sur {symbol} à {price:.4f}\n🎯 TP: {tp:.4f} / 🛑 SL: {sl:.4f}",
-                    emoji="📌"
-                )
-
-            except Exception as e:
-                logging.error(f"❌ Erreur order {symbol} : {e}")
-                self.notifier.send_message(f"❌ Erreur ordre {symbol} : {e}", emoji="⚠️")
-
-
-
+        except Exception as e:
+            logging.error(f"❌ Erreur order {symbol} : {e}")
+            self.notifier.send_message(f"❌ Erreur ordre {symbol} : {e}", emoji="⚠️")
 
     def handle_telegram_command(self, command):
         if command == '/start':
             self.start_bot()
-
         elif command == '/stop':
             self.stop_bot()
-
         elif command == '/status':
             status = "✅ En marche" if self.is_running else "❌ Arrêté"
             positions_info = ""
@@ -232,18 +240,16 @@ class BotTrader:
 {positions_info}
 """.strip()
             self.notifier.send_message(message, 'ℹ️')
-
         elif command == '/increase':
             self.trade_amount += 5
             self.notifier.send_message(f"💵 Montant mis à jour : {self.trade_amount} USDT")
-
         elif command == '/decrease':
             self.trade_amount = max(1, self.trade_amount - 5)
             self.notifier.send_message(f"💸 Montant mis à jour : {self.trade_amount} USDT")
-
         elif command == '/menu':
             self.notifier.send_menu()
-
+        elif command == '/closeall':
+            self.close_all_positions()
         else:
             self.notifier.send_message("Commande non reconnue.", '❗')
 
@@ -257,7 +263,7 @@ def status():
 @app.route('/telegram', methods=['POST'])
 def telegram_webhook():
     data = request.json
-    logging.info(f"📩 Reçu de Telegram : {json.dumps(data)}")  # ✅ log utile pour debug
+    logging.info(f"📩 Reçu de Telegram : {json.dumps(data)}")
 
     if 'message' in data and 'text' in data['message']:
         command = data['message']['text']
@@ -268,7 +274,5 @@ def telegram_webhook():
 
     return '', 200
 
-
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
-
