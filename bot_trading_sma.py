@@ -53,7 +53,10 @@ class BotTrader:
     def __init__(self):
         self.exchange = ccxt.bybit({
             'apiKey': os.getenv('BYBIT_API_KEY'),
-            'secret': os.getenv('BYBIT_API_SECRET')
+            'secret': os.getenv('BYBIT_API_SECRET'),
+            'options': {
+                'createMarketBuyOrderRequiresPrice': False
+            }
         })
         self.symbols = ['DOGE/USDT', 'ADA/USDT']
         self.trade_amount = 5
