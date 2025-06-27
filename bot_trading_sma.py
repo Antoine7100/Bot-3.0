@@ -106,7 +106,8 @@ class BotTrader:
             'entry': price,
             'tp': tp,
             'sl': sl,
-            'trailing_sl': trailing_sl
+            'trailing_sl': trailing_sl,
+            'amount': adjusted_amount
         })
 
         self.exchange.create_order(symbol, 'market', side, adjusted_amount)
@@ -125,14 +126,22 @@ class BotTrader:
 
         for pos in self.positions[:]:
             try:
+                price = self.exchange.fetch_ticker(pos['symbol'])['last']
+                adjusted_amount = max(5 / price, pos['amount'])
+                order_value = price * adjusted_amount
+
+                if order_value < 5:
+                    logging.warning(f"❌ Fermeture ignorée : {pos['symbol']}, montant trop faible ({order_value:.2f} USDT)")
+                    self.notifier.send_message(f"❌ Montant trop faible pour clôturer {pos['symbol']} ({order_value:.2f} USDT).", "⚠️")
+                    continue
+
                 closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
-                self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
+                self.exchange.create_order(pos['symbol'], 'market', closing_side, adjusted_amount)
                 self.positions.remove(pos)
                 self.notifier.send_message(f"🔒 Fermeture manuelle de {pos['symbol']} ({pos['side']})")
             except Exception as e:
                 logging.error(f"❌ Erreur fermeture {pos['symbol']} : {e}")
                 self.notifier.send_message(f"❌ Erreur fermeture {pos['symbol']} : {e}", '⚠️')
-
 
     def run_bot(self):
         logging.info("🚀 Bot actif")
@@ -177,43 +186,43 @@ class BotTrader:
             for pos in self.positions[:]:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
-                    side = pos['side']
 
-                    # Trailing stop : ajuste le SL si le prix évolue favorablement
-                    if side == 'buy' and last_price > pos['entry']:
-                        new_trailing_sl = last_price * (1 - self.sl_percentage)
-                        if new_trailing_sl > pos['trailing_sl']:
-                            pos['trailing_sl'] = new_trailing_sl
-                            logging.info(f"🔄 Trailing SL (BUY) ajusté pour {pos['symbol']} à {new_trailing_sl:.4f}")
+                    # Met à jour le trailing stop si le prix monte
+                    if pos['side'] == 'buy' and last_price > pos['entry']:
+                        new_sl = last_price * (1 - self.sl_percentage)
+                        if new_sl > pos['trailing_sl']:
+                            pos['trailing_sl'] = new_sl
 
-                    elif side == 'sell' and last_price < pos['entry']:
-                        new_trailing_sl = last_price * (1 + self.sl_percentage)
-                        if new_trailing_sl < pos['trailing_sl']:
-                            pos['trailing_sl'] = new_trailing_sl
-                            logging.info(f"🔄 Trailing SL (SELL) ajusté pour {pos['symbol']} à {new_trailing_sl:.4f}")
+                    elif pos['side'] == 'sell' and last_price < pos['entry']:
+                        new_sl = last_price * (1 + self.sl_percentage)
+                        if new_sl < pos['trailing_sl']:
+                            pos['trailing_sl'] = new_sl
 
-                    # Take Profit
-                    if (side == 'buy' and last_price >= pos['tp']) or \
-                       (side == 'sell' and last_price <= pos['tp']):
+                    sl_hit = (pos['side'] == 'buy' and last_price <= pos['trailing_sl']) or \
+                             (pos['side'] == 'sell' and last_price >= pos['trailing_sl'])
+
+                    tp_hit = (pos['side'] == 'buy' and last_price >= pos['tp']) or \
+                             (pos['side'] == 'sell' and last_price <= pos['tp'])
+
+                    if tp_hit:
                         message = f"🌟 TP atteint pour {pos['symbol']} à {last_price:.4f} ✅"
                         emoji = '🎉'
-                        self.positions.remove(pos)
-                        closing_side = 'sell' if side == 'buy' else 'buy'
-                        self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
-                        self.notifier.send_message(message, emoji)
-
-                    # Stop Loss (utilise trailing_sl)
-                    elif (side == 'buy' and last_price <= pos['trailing_sl']) or \
-                         (side == 'sell' and last_price >= pos['trailing_sl']):
-                        message = f"❌ SL atteint pour {pos['symbol']} à {last_price:.4f} ⚠️"
+                    elif sl_hit:
+                        message = f"❌ SL (trailing) atteint pour {pos['symbol']} à {last_price:.4f} ⚠️"
                         emoji = '⚠️'
-                        self.positions.remove(pos)
-                        closing_side = 'sell' if side == 'buy' else 'buy'
-                        self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
-                        self.notifier.send_message(message, emoji)
+                    else:
+                        continue
+
+                    closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
+                    adjusted_amount = max(5 / last_price, pos['amount'])
+                    self.exchange.create_order(pos['symbol'], 'market', closing_side, adjusted_amount)
+                    self.positions.remove(pos)
+                    self.notifier.send_message(message, emoji)
+
                 except Exception as e:
                     logging.error(f"Erreur monitor {pos['symbol']} : {e}")
             time.sleep(15)
+
 
     def place_order(self, symbol, side, amount):
         try:
