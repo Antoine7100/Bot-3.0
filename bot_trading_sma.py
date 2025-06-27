@@ -86,28 +86,24 @@ class BotTrader:
             Thread(target=self.monitor_positions, daemon=True).start()
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
-
-def enter_trade(self, symbol, side='buy'):
-    price = self.exchange.fetch_ticker(symbol)['last']
-    order_value = price * self.trade_amount
-    min_order_usdt = 5
-    if order_value < min_order_usdt:
-        logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
-        self.notifier.send_message(f"❌ Montant trop faible pour {symbol} ({order_value:.2f} USDT). Ordre ignoré.", "⚠️")
-        return
-
-    tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-    sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
-    self.positions.append({
-        'symbol': symbol,
-        'side': side,
-        'entry': price,
-        'tp': tp,
-        'sl': sl
-    })
-    self.exchange.create_order(symbol, 'market', side, self.trade_amount)
-    self.notifier.send_message(f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌')
-
+    def enter_trade(self, symbol, side='buy'):
+        price = self.exchange.fetch_ticker(symbol)['last']
+        order_value = price * self.trade_amount
+        if order_value < 5:
+            logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
+            self.notifier.send_message(f"❌ Montant trop faible pour {symbol} ({order_value:.2f} USDT). Ordre ignoré.", "⚠️")
+            return
+        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+        self.positions.append({
+            'symbol': symbol,
+            'side': side,
+            'entry': price,
+            'tp': tp,
+            'sl': sl
+        })
+        self.exchange.create_order(symbol, 'market', side, self.trade_amount)
+        self.notifier.send_message(f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌')
 
     def stop_bot(self):
         self.is_running = False
@@ -172,7 +168,12 @@ def enter_trade(self, symbol, side='buy'):
             for pos in self.positions[:]:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
-
+                    order_value = last_price * self.trade_amount
+                    if order_value < 5:
+                        logging.warning(f"❌ Vente ignorée pour {pos['symbol']} - montant trop faible ({order_value:.2f} USDT)")
+                        self.notifier.send_message(f"❌ Vente ignorée pour {pos['symbol']} ({order_value:.2f} USDT trop faible)", "⚠️")
+                        self.positions.remove(pos)
+                        continue
                     if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
                        (pos['side'] == 'sell' and last_price <= pos['tp']):
                         message = f"🌟 TP atteint pour {pos['symbol']} à {last_price:.4f} ✅"
@@ -181,7 +182,6 @@ def enter_trade(self, symbol, side='buy'):
                         closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
                         self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
                         self.notifier.send_message(message, emoji)
-
                     elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
                          (pos['side'] == 'sell' and last_price >= pos['sl']):
                         message = f"❌ SL atteint pour {pos['symbol']} à {last_price:.4f} ⚠️"
@@ -190,7 +190,6 @@ def enter_trade(self, symbol, side='buy'):
                         closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
                         self.exchange.create_order(pos['symbol'], 'market', closing_side, self.trade_amount)
                         self.notifier.send_message(message, emoji)
-
                 except Exception as e:
                     logging.error(f"Erreur monitor {pos['symbol']} : {e}")
             time.sleep(15)
