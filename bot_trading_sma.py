@@ -62,20 +62,25 @@ class BotTrader:
         self.exchange = ccxt.bybit({
             'apiKey': os.getenv('BYBIT_API_KEY'),
             'secret': os.getenv('BYBIT_API_SECRET'),
-            'options': {
-                'createMarketBuyOrderRequiresPrice': False
-            }
+            'options': {'createMarketBuyOrderRequiresPrice': False}
         })
-
         self.symbols = [config["symbol"]]
         self.trade_amount = config["stake_amount"]
-        self.tp_percentage = config["tp_percentage"]
-        self.sl_percentage = config["sl_percentage"]
+        self.tp_percentage = 0.004  # TP scalping rapide (0.4%)
+        self.sl_percentage = 0.002  # SL serré (0.2%)
         self.trades_file = config["trades_file"]
-
         self.is_running = False
         self.notifier = TelegramNotifier()
         self.positions = []
+
+    def start_bot(self):
+        if not self.is_running:
+            self.is_running = True
+            self.notifier.send_message("🚦 Bot Smart Scalper lancé", '🟢')
+            Thread(target=self.run_bot, daemon=True).start()
+            Thread(target=self.monitor_positions, daemon=True).start()
+        else:
+            self.notifier.send_message("⚠️ Le bot est déjà en marche.")
 
     def start_bot(self):
         if not self.is_running:
@@ -87,18 +92,24 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
     def enter_trade(self, symbol, side='buy'):
+        if len(self.positions) >= 3:
+            self.notifier.send_message("⚠️ Trop de positions ouvertes, entrée ignorée.")
+            return
+
+        if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
+            self.notifier.send_message(f"⛔ Trade déjà ouvert pour {symbol} ({side})", "⚠️")
+            return
+
         price = self.exchange.fetch_ticker(symbol)['last']
         adjusted_amount = max(5 / price, self.trade_amount)
         order_value = price * adjusted_amount
 
         if order_value < 5:
-            logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
-            self.notifier.send_message(f"❌ Montant trop faible pour {symbol} ({order_value:.2f} USDT). Ordre ignoré.", "⚠️")
+            self.notifier.send_message(f"❌ Trade ignoré (trop faible) : {symbol} à {order_value:.2f} USDT", "⚠️")
             return
 
         tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
         sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
-        trailing_sl = sl
 
         self.positions.append({
             'symbol': symbol,
@@ -106,15 +117,11 @@ class BotTrader:
             'entry': price,
             'tp': tp,
             'sl': sl,
-            'trailing_sl': trailing_sl,
             'amount': adjusted_amount
         })
 
         self.exchange.create_order(symbol, 'market', side, adjusted_amount)
-        self.notifier.send_message(
-            f"✅ Nouvelle position {side.upper()} ouverte sur {symbol} à {price:.4f} 🎯 TP: {tp:.4f}, SL: {sl:.4f}", '📌'
-        )
-
+        self.notifier.send_message(f"📈 {side.upper()} sur {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
     def stop_bot(self):
         self.is_running = False
         self.notifier.send_message("🔝 Bot arrêté", '🔴')
@@ -172,7 +179,6 @@ class BotTrader:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
             time.sleep(10)  # scalping => analyse rapide
 
-
     def monitor_positions(self):
         while self.is_running:
             for pos in self.positions[:]:
@@ -192,9 +198,12 @@ class BotTrader:
 
                     if close:
                         side = 'sell' if pos['side'] == 'buy' else 'buy'
-                        self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
-                        self.positions.remove(pos)
-                        self.notifier.send_message(msg, '📤')
+                        order = self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
+                        if order:
+                            self.positions.remove(pos)
+                            self.notifier.send_message(msg, '📤')
+                        else:
+                            self.notifier.send_message(f"❌ Échec fermeture position {pos['symbol']}", '⚠️')
 
                 except Exception as e:
                     logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
