@@ -97,7 +97,7 @@ class BotTrader:
             return
 
         if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
-            self.notifier.send_message(f"⛔ Trade déjà ouvert pour {symbol} ({side})", "⚠️")
+            self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
             return
 
         price = self.exchange.fetch_ticker(symbol)['last']
@@ -120,7 +120,7 @@ class BotTrader:
             'amount': adjusted_amount
         })
 
-        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
+        self.exchange.create_order(symbol, 'limit', side, adjusted_amount, price)  # Limit order
         self.notifier.send_message(f"📈 {side.upper()} sur {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
     def stop_bot(self):
         self.is_running = False
@@ -198,10 +198,10 @@ class BotTrader:
 
                     if close:
                         side = 'sell' if pos['side'] == 'buy' else 'buy'
-                        order = self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
+                        order = self.exchange.create_order(pos['symbol'], 'limit', side, pos['amount'], last_price)
                         if order:
                             self.positions.remove(pos)
-                            self.notifier.send_message(msg, '📤')
+                            self.notifier.send_message(msg, '📄')
                         else:
                             self.notifier.send_message(f"❌ Échec fermeture position {pos['symbol']}", '⚠️')
 
@@ -265,9 +265,9 @@ class BotTrader:
             for pos in self.positions[:]:
                 try:
                     side = 'sell' if pos['side'] == 'buy' else 'buy'
-                    self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
+                    self.exchange.create_order(pos['symbol'], 'limit', side, pos['amount'], self.exchange.fetch_ticker(pos['symbol'])['last'])
                     self.positions.remove(pos)
-                    self.notifier.send_message(f"🔒 Fermeture forcée de {pos['symbol']}", '⚠️')
+                    self.notifier.send_message(f"🔐 Fermeture forcée de {pos['symbol']}", '⚠️')
                 except Exception as e:
                     logging.error(f"Erreur fermeture forcée {pos['symbol']} : {e}")
         else:
