@@ -144,41 +144,33 @@ class BotTrader:
                 self.notifier.send_message(f"❌ Erreur fermeture {pos['symbol']} : {e}", '⚠️')
 
     def run_bot(self):
-        logging.info("🚀 Bot actif")
         while self.is_running:
-            active_symbols = {pos['symbol'] for pos in self.positions}
             for symbol in self.symbols:
-                if symbol in active_symbols:
-                    continue
                 try:
-                    data = self.exchange.fetch_ohlcv(symbol, '1m')
+                    data = self.exchange.fetch_ohlcv(symbol, '1m', limit=30)
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                    if len(df) < 20:
-                        continue
 
-                    sma3 = df['close'].rolling(window=3).mean().iloc[-1]
-                    sma20 = df['close'].rolling(window=20).mean().iloc[-1]
+                    df['ema5'] = df['close'].ewm(span=5).mean()
+                    df['ema20'] = df['close'].ewm(span=20).mean()
                     delta = df['close'].diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=5).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=5).mean()
+                    gain = delta.where(delta > 0, 0).rolling(14).mean()
+                    loss = -delta.where(delta < 0, 0).rolling(14).mean()
                     rs = gain / loss
-                    rsi = 100 - (100 / (1 + rs))
-                    current_rsi = rsi.iloc[-1]
+                    df['rsi'] = 100 - (100 / (1 + rs))
 
-                    if pd.isna(sma3) or pd.isna(sma20) or pd.isna(current_rsi):
-                        continue
+                    price = df['close'].iloc[-1]
+                    ema5 = df['ema5'].iloc[-1]
+                    ema20 = df['ema20'].iloc[-1]
+                    rsi = df['rsi'].iloc[-1]
+                    volume = df['volume'].iloc[-1]
 
-                    logging.info(f"🔍 {symbol} - SMA3: {sma3:.4f}, SMA20: {sma20:.4f}, RSI: {current_rsi:.2f}")
-
-                    # NOUVELLE CONDITION : agressive mais filtrée
-                    if sma3 > sma20 and current_rsi < 70:
-                        self.enter_trade(symbol, side='buy')
-                    elif sma3 < sma20 and current_rsi > 30:
-                        self.enter_trade(symbol, side='sell')
-
+                    if price > ema5 > ema20 and rsi > 50 and volume > 100:
+                        self.enter_trade(symbol, 'buy')
+                    elif price < ema5 < ema20 and rsi < 50 and volume > 100:
+                        self.enter_trade(symbol, 'sell')
                 except Exception as e:
-                    logging.error(f"❌ Erreur run_bot pour {symbol} : {e}")
-            time.sleep(30)
+                    logging.error(f"Erreur run_bot pour {symbol} : {e}")
+            time.sleep(10)  # scalping => analyse rapide
 
 
     def monitor_positions(self):
