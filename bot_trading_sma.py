@@ -179,41 +179,27 @@ class BotTrader:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
 
-                    # Met à jour le trailing stop si le prix monte
-                    if pos['side'] == 'buy' and last_price > pos['entry']:
-                        new_sl = last_price * (1 - self.sl_percentage)
-                        if new_sl > pos['trailing_sl']:
-                            pos['trailing_sl'] = new_sl
-
-                    elif pos['side'] == 'sell' and last_price < pos['entry']:
-                        new_sl = last_price * (1 + self.sl_percentage)
-                        if new_sl < pos['trailing_sl']:
-                            pos['trailing_sl'] = new_sl
-
-                    sl_hit = (pos['side'] == 'buy' and last_price <= pos['trailing_sl']) or \
-                             (pos['side'] == 'sell' and last_price >= pos['trailing_sl'])
-
-                    tp_hit = (pos['side'] == 'buy' and last_price >= pos['tp']) or \
-                             (pos['side'] == 'sell' and last_price <= pos['tp'])
-
-                    if tp_hit:
-                        message = f"🌟 TP atteint pour {pos['symbol']} à {last_price:.4f} ✅"
-                        emoji = '🎉'
-                    elif sl_hit:
-                        message = f"❌ SL (trailing) atteint pour {pos['symbol']} à {last_price:.4f} ⚠️"
-                        emoji = '⚠️'
+                    if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
+                       (pos['side'] == 'sell' and last_price <= pos['tp']):
+                        msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
+                        close = True
+                    elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
+                         (pos['side'] == 'sell' and last_price >= pos['sl']):
+                        msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
+                        close = True
                     else:
-                        continue
+                        close = False
 
-                    closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
-                    adjusted_amount = max(5 / last_price, pos['amount'])
-                    self.exchange.create_order(pos['symbol'], 'market', closing_side, adjusted_amount)
-                    self.positions.remove(pos)
-                    self.notifier.send_message(message, emoji)
+                    if close:
+                        side = 'sell' if pos['side'] == 'buy' else 'buy'
+                        self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
+                        self.positions.remove(pos)
+                        self.notifier.send_message(msg, '📤')
 
                 except Exception as e:
-                    logging.error(f"Erreur monitor {pos['symbol']} : {e}")
+                    logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
             time.sleep(15)
+
 
 
     def place_order(self, symbol, side, amount):
@@ -252,33 +238,29 @@ class BotTrader:
         if command == '/start':
             self.start_bot()
         elif command == '/stop':
-            self.stop_bot()
+            self.is_running = False
+            self.notifier.send_message("⛔ Bot arrêté", '🔴')
         elif command == '/status':
-            status = "✅ En marche" if self.is_running else "❌ Arrêté"
-            positions_info = ""
-            if self.positions:
-                positions_info += "\n📊 Positions ouvertes :\n"
-                for pos in self.positions:
-                    positions_info += f"• {pos['symbol']} ({pos['side']}) → TP: {pos['tp']:.4f}, SL: {pos['trailing_sl']:.4f}\n"
-            else:
-                positions_info += "\nAucune position ouverte."
-
-            message = f"""
-🔎 Statut du bot : {status}
-💼 Montant par trade : {self.trade_amount} USDT
-{positions_info}
-""".strip()
-            self.notifier.send_message(message, 'ℹ️')
-        elif command == '/increase':
-            self.trade_amount += 5
-            self.notifier.send_message(f"💵 Montant mis à jour : {self.trade_amount} USDT")
-        elif command == '/decrease':
-            self.trade_amount = max(1, self.trade_amount - 5)
-            self.notifier.send_message(f"💸 Montant mis à jour : {self.trade_amount} USDT")
+            running = "✅ Actif" if self.is_running else "❌ Inactif"
+            infos = f"Statut : {running}\nMontant par trade : {self.trade_amount} USDT\nPositions : {len(self.positions)}"
+            self.notifier.send_message(infos, 'ℹ️')
         elif command == '/menu':
             self.notifier.send_menu()
+        elif command == '/increase':
+            self.trade_amount += 5
+            self.notifier.send_message(f"💵 Nouveau montant : {self.trade_amount} USDT")
+        elif command == '/decrease':
+            self.trade_amount = max(5, self.trade_amount - 5)
+            self.notifier.send_message(f"💸 Nouveau montant : {self.trade_amount} USDT")
         elif command == '/closeall':
-            self.close_all_positions()
+            for pos in self.positions[:]:
+                try:
+                    side = 'sell' if pos['side'] == 'buy' else 'buy'
+                    self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
+                    self.positions.remove(pos)
+                    self.notifier.send_message(f"🔒 Fermeture forcée de {pos['symbol']}", '⚠️')
+                except Exception as e:
+                    logging.error(f"Erreur fermeture forcée {pos['symbol']} : {e}")
         else:
             self.notifier.send_message("Commande non reconnue.", '❗')
 
