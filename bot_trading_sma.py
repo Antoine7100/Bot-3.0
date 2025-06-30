@@ -22,6 +22,7 @@ class TelegramNotifier:
     def __init__(self):
         self.token = os.getenv('TELEGRAM_TOKEN')
         self.chat_id = os.getenv('TELEGRAM_CHAT_ID')
+        self.silent_notifications = set()  # Symboles déjà notifiés pour trade ouvert
 
     def send_message(self, message, emoji='💬', reply_markup=None):
         try:
@@ -93,11 +94,12 @@ class BotTrader:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
     def enter_trade(self, symbol, side='buy'):
         if len(self.positions) >= 3:
-            self.notifier.send_message("⚠️ Trop de positions ouvertes, entrée ignorée.")
-            return
+            return  # trop de positions ouvertes, on ignore sans notifer
 
         if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
-            self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
+            if symbol not in self.notifier.silent_notifications:
+                self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
+                self.notifier.silent_notifications.add(symbol)
             return
 
         price = self.exchange.fetch_ticker(symbol)['last']
@@ -105,8 +107,7 @@ class BotTrader:
         order_value = price * adjusted_amount
 
         if order_value < 5:
-            self.notifier.send_message(f"❌ Trade ignoré (trop faible) : {symbol} à {order_value:.2f} USDT", "⚠️")
-            return
+            return  # trade ignoré sans spam
 
         tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
         sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
@@ -120,7 +121,7 @@ class BotTrader:
             'amount': adjusted_amount
         })
 
-        self.exchange.create_order(symbol, 'limit', side, adjusted_amount, price)  # Limit order
+        self.exchange.create_order(symbol, 'limit', side, adjusted_amount, price)
         self.notifier.send_message(f"📈 {side.upper()} sur {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
     def stop_bot(self):
         self.is_running = False
@@ -202,8 +203,6 @@ class BotTrader:
                         if order:
                             self.positions.remove(pos)
                             self.notifier.send_message(msg, '📄')
-                        else:
-                            self.notifier.send_message(f"❌ Échec fermeture position {pos['symbol']}", '⚠️')
 
                 except Exception as e:
                     logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
