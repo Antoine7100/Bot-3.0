@@ -65,7 +65,7 @@ class BotTrader:
             'secret': os.getenv('BYBIT_API_SECRET'),
             'options': {'createMarketBuyOrderRequiresPrice': False}
         })
-        self.symbols = [config["symbol"]]
+        self.symbols = config.get("symbols", ["DOGE/USDT"])
         self.trade_amount = config["stake_amount"]
         self.tp_percentage = 0.012  # TP 1.2%
         self.sl_percentage = 0.005  # SL 0.5%
