@@ -67,8 +67,8 @@ class BotTrader:
         })
         self.symbols = [config["symbol"]]
         self.trade_amount = config["stake_amount"]
-        self.tp_percentage = 0.004  # TP scalping rapide (0.4%)
-        self.sl_percentage = 0.002  # SL serré (0.2%)
+        self.tp_percentage = 0.012  # TP 1.2%
+        self.sl_percentage = 0.005  # SL 0.5%
         self.trades_file = config["trades_file"]
         self.is_running = False
         self.notifier = TelegramNotifier()
@@ -93,9 +93,6 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
     def enter_trade(self, symbol, side='buy'):
-        if len(self.positions) >= 3:
-            return  # trop de positions ouvertes, on ignore sans notifer
-
         if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
             if symbol not in self.notifier.silent_notifications:
                 self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
@@ -107,7 +104,7 @@ class BotTrader:
         order_value = price * adjusted_amount
 
         if order_value < 5:
-            return  # trade ignoré sans spam
+            return
 
         tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
         sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
@@ -121,8 +118,9 @@ class BotTrader:
             'amount': adjusted_amount
         })
 
-        self.exchange.create_order(symbol, 'limit', side, adjusted_amount, price)
-        self.notifier.send_message(f"📈 {side.upper()} sur {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
+        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
+        self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
+
     def stop_bot(self):
         self.is_running = False
         self.notifier.send_message("🔝 Bot arrêté", '🔴')
@@ -160,6 +158,8 @@ class BotTrader:
 
                     df['ema5'] = df['close'].ewm(span=5).mean()
                     df['ema20'] = df['close'].ewm(span=20).mean()
+                    df['high_break'] = df['high'].rolling(window=10).max()
+                    df['low_break'] = df['low'].rolling(window=10).min()
                     delta = df['close'].diff()
                     gain = delta.where(delta > 0, 0).rolling(14).mean()
                     loss = -delta.where(delta < 0, 0).rolling(14).mean()
@@ -167,18 +167,21 @@ class BotTrader:
                     df['rsi'] = 100 - (100 / (1 + rs))
 
                     price = df['close'].iloc[-1]
+                    high_break = df['high_break'].iloc[-2]
+                    low_break = df['low_break'].iloc[-2]
                     ema5 = df['ema5'].iloc[-1]
                     ema20 = df['ema20'].iloc[-1]
                     rsi = df['rsi'].iloc[-1]
                     volume = df['volume'].iloc[-1]
 
-                    if price > ema5 > ema20 and rsi > 50 and volume > 100:
+                    if price > high_break and ema5 > ema20 and rsi > 55 and volume > 100:
                         self.enter_trade(symbol, 'buy')
-                    elif price < ema5 < ema20 and rsi < 50 and volume > 100:
+                    elif price < low_break and ema5 < ema20 and rsi < 45 and volume > 100:
                         self.enter_trade(symbol, 'sell')
                 except Exception as e:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
-            time.sleep(10)  # scalping => analyse rapide
+            time.sleep(10)
+
 
     def monitor_positions(self):
         while self.is_running:
