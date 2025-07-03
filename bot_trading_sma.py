@@ -13,7 +13,14 @@ from datetime import datetime
 # Chargement de la config
 with open("config.json") as f:
     config = json.load(f)
-
+    
+# Chargement des stats
+if os.path.exists("stats.json"):
+    with open("stats.json") as sf:
+        saved_stats = json.load(sf)
+else:
+    saved_stats = {"win_count": 0, "loss_count": 0}
+    
 # Configuration logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -80,10 +87,13 @@ class BotTrader:
         self.is_running = False
         self.notifier = TelegramNotifier()
         self.positions = []
-        self.win_count = 0
-        self.loss_count = 0
+        self.win_count = saved_stats.get("win_count", 0)
+        self.loss_count = saved_stats.get("loss_count", 0)
 
-        
+    def save_stats(self):
+        with open("stats.json", "w") as f:
+            json.dump({"win_count": self.win_count, "loss_count": self.loss_count}, f)
+            
     def sync_with_exchange(self):
         try:
             # Récupère les vraies positions ouvertes sur Bybit
@@ -232,11 +242,13 @@ class BotTrader:
                        (pos['side'] == 'sell' and last_price <= pos['tp']):
                         msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
                         self.win_count += 1
+                        self.save_stats()
                         close = True
                     elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
                          (pos['side'] == 'sell' and last_price >= pos['sl']):
                         msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
                         self.loss_count += 1
+                        self.save_stats()
                         close = True
                     else:
                         close = False
@@ -249,10 +261,6 @@ class BotTrader:
                 except Exception as e:
                     logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
             time.sleep(15)
-
-
-
-
 
 
     def place_order(self, symbol, side, amount):
@@ -318,11 +326,17 @@ class BotTrader:
                     logging.error(f"Erreur fermeture forcée {pos['symbol']} : {e}")
         elif command == '/stats':
             total = self.win_count + self.loss_count
-            winrate = (self.win_count / total * 100) if total > 0 else 0
-            stats = f"📊 Stats\nGagnants: {self.win_count}\nPerdants: {self.loss_count}\nWinrate: {winrate:.2f}%"
-            self.notifier.send_message(stats, '📈')
-        else:
-            self.notifier.send_message("Commande non reconnue.", '❗')
+            if total > 0:
+                success_rate = (self.win_count / total) * 100
+                msg = (
+                    f"📊 *Statistiques du bot* :\n"
+                    f"✅ Trades gagnants : {self.win_count}\n"
+                    f"❌ Trades perdants : {self.loss_count}\n"
+                    f"📈 Taux de réussite : {success_rate:.2f}%"
+                )
+            else:
+                msg = "📊 Aucune statistique disponible pour l’instant."
+            self.notifier.send_message(msg, '📊')
 
 
 bot = BotTrader()
