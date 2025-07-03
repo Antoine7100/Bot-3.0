@@ -2,7 +2,7 @@
   "symbols": ["DOGE/USDT", "ADA/USDT", "BTC/USDT"],
   "stake_amount": 10,
   "tp_percentage": 0.012,
-  "sl_percentage": 0.005,
+  "sl_percentage": 0.008,
   "leverage": 5,
   "trades_file": "trades.json"
 }
