@@ -55,10 +55,13 @@ class TelegramNotifier:
                 ],
                 [
                     {"text": "🔄 Sync", "callback_data": "/sync"}
+                ],
+                [
+                    {"text": "📊 Stats", "callback_data": "/stats"}
                 ]
             ]
         }
-        self.send_message("🛠️ Menu de contrôle du bot", '🗜️', reply_markup=keyboard)
+        self.send_message("🛠️ Menu de contrôle du bot", '🕜', reply_markup=keyboard)
 
 class BotTrader:
     def __init__(self):
@@ -75,7 +78,10 @@ class BotTrader:
         self.is_running = False
         self.notifier = TelegramNotifier()
         self.positions = []
-
+        self.trailing_gap = 0.002  # 0.2% trailing gap
+        self.win_count = 0
+        self.loss_count = 0
+        
     def sync_with_exchange(self):
         try:
             # Récupère les vraies positions ouvertes sur Bybit
@@ -173,11 +179,12 @@ class BotTrader:
         while self.is_running:
             for symbol in self.symbols:
                 try:
-                    data = self.exchange.fetch_ohlcv(symbol, '1m', limit=30)
+                    data = self.exchange.fetch_ohlcv(symbol, '1m', limit=50)
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
                     df['ema5'] = df['close'].ewm(span=5).mean()
                     df['ema20'] = df['close'].ewm(span=20).mean()
+                    df['ema50'] = df['close'].ewm(span=50).mean()
                     df['high_break'] = df['high'].rolling(window=10).max()
                     df['low_break'] = df['low'].rolling(window=10).min()
                     delta = df['close'].diff()
@@ -191,16 +198,18 @@ class BotTrader:
                     low_break = df['low_break'].iloc[-2]
                     ema5 = df['ema5'].iloc[-1]
                     ema20 = df['ema20'].iloc[-1]
+                    ema50 = df['ema50'].iloc[-1]
                     rsi = df['rsi'].iloc[-1]
                     volume = df['volume'].iloc[-1]
 
-                    if price > high_break and ema5 > ema20 and rsi > 55 and volume > 100:
+                    if price > high_break and ema5 > ema20 > ema50 and rsi > 60 and volume > 100:
                         self.enter_trade(symbol, 'buy')
-                    elif price < low_break and ema5 < ema20 and rsi < 45 and volume > 100:
+                    elif price < low_break and ema5 < ema20 < ema50 and rsi < 40 and volume > 100:
                         self.enter_trade(symbol, 'sell')
                 except Exception as e:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
             time.sleep(10)
+
 
 
     def monitor_positions(self):
@@ -208,28 +217,40 @@ class BotTrader:
             for pos in self.positions[:]:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
+                    side = pos['side']
 
-                    if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
-                       (pos['side'] == 'sell' and last_price <= pos['tp']):
+                    if side == 'buy':
+                        new_sl = last_price - (last_price * self.trailing_gap)
+                        if new_sl > pos['sl'] and last_price > pos['entry']:
+                            pos['sl'] = new_sl
+                    elif side == 'sell':
+                        new_sl = last_price + (last_price * self.trailing_gap)
+                        if new_sl < pos['sl'] and last_price < pos['entry']:
+                            pos['sl'] = new_sl
+
+                    if (side == 'buy' and last_price >= pos['tp']) or \
+                       (side == 'sell' and last_price <= pos['tp']):
                         msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
                         close = True
-                    elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
-                         (pos['side'] == 'sell' and last_price >= pos['sl']):
+                        self.win_count += 1
+                    elif (side == 'buy' and last_price <= pos['sl']) or \
+                         (side == 'sell' and last_price >= pos['sl']):
                         msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
                         close = True
+                        self.loss_count += 1
                     else:
                         close = False
 
                     if close:
-                        side = 'sell' if pos['side'] == 'buy' else 'buy'
-                        order = self.exchange.create_order(pos['symbol'], 'limit', side, pos['amount'], last_price)
-                        if order:
-                            self.positions.remove(pos)
-                            self.notifier.send_message(msg, '📄')
+                        close_side = 'sell' if side == 'buy' else 'buy'
+                        self.exchange.create_order(pos['symbol'], 'market', close_side, pos['amount'])
+                        self.positions.remove(pos)
+                        self.notifier.send_message(msg + f" | Gain: {self.win_count}, Perte: {self.loss_count}", '📄')
 
                 except Exception as e:
                     logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
             time.sleep(15)
+
 
 
 
@@ -289,13 +310,19 @@ class BotTrader:
             for pos in self.positions[:]:
                 try:
                     side = 'sell' if pos['side'] == 'buy' else 'buy'
-                    self.exchange.create_order(pos['symbol'], 'limit', side, pos['amount'], self.exchange.fetch_ticker(pos['symbol'])['last'])
+                    self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
                     self.positions.remove(pos)
                     self.notifier.send_message(f"🔐 Fermeture forcée de {pos['symbol']}", '⚠️')
                 except Exception as e:
                     logging.error(f"Erreur fermeture forcée {pos['symbol']} : {e}")
+        elif command == '/stats':
+            total = self.win_count + self.loss_count
+            winrate = (self.win_count / total * 100) if total > 0 else 0
+            stats = f"📊 Stats\nGagnants: {self.win_count}\nPerdants: {self.loss_count}\nWinrate: {winrate:.2f}%"
+            self.notifier.send_message(stats, '📈')
         else:
             self.notifier.send_message("Commande non reconnue.", '❗')
+
 
 bot = BotTrader()
 
