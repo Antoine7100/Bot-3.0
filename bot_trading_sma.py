@@ -73,7 +73,7 @@ class BotTrader:
         self.symbols = config["symbols"] if isinstance(config["symbols"], list) else [config["symbols"]]
         self.trade_amount = config["stake_amount"]
         self.tp_percentage = 0.012  # TP 1.2%
-        self.sl_percentage = 0.005  # SL 0.5%
+        self.sl_percentage = 0.008  # SL 0.8%
         self.trades_file = config["trades_file"]
         self.is_running = False
         self.notifier = TelegramNotifier()
