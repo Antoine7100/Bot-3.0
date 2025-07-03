@@ -71,17 +71,18 @@ class BotTrader:
             'secret': os.getenv('BYBIT_API_SECRET'),
             'options': {'createMarketBuyOrderRequiresPrice': False}
         })
-        self.symbols = config["symbols"] if isinstance(config["symbols"], list) else [config["symbols"]]
+        self.symbols = config["symbols"]
         self.trade_amount = config["stake_amount"]
-        self.tp_percentage = 0.012  # TP 1.2%
-        self.sl_percentage = 0.008  # SL 0.8%
+        self.tp_percentage = 0.012
+        self.sl_percentage = 0.008
+        self.trailing_percentage = 0.003  # 0.3% trailing stop
         self.trades_file = config["trades_file"]
         self.is_running = False
         self.notifier = TelegramNotifier()
         self.positions = []
-        self.trailing_gap = 0.002  # 0.2% trailing gap
         self.win_count = 0
         self.loss_count = 0
+
         
     def sync_with_exchange(self):
         try:
@@ -225,39 +226,40 @@ class BotTrader:
             for pos in self.positions[:]:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
-                    side = pos['side']
 
-                    if side == 'buy':
-                        new_sl = last_price - (last_price * self.trailing_gap)
-                        if new_sl > pos['sl'] and last_price > pos['entry']:
+                    # Trailing stop dynamique (en %)
+                    if pos['side'] == 'buy' and last_price > pos['entry']:
+                        new_sl = last_price * (1 - self.trailing_percentage)
+                        if new_sl > pos['sl']:
                             pos['sl'] = new_sl
-                    elif side == 'sell':
-                        new_sl = last_price + (last_price * self.trailing_gap)
-                        if new_sl < pos['sl'] and last_price < pos['entry']:
+                    elif pos['side'] == 'sell' and last_price < pos['entry']:
+                        new_sl = last_price * (1 + self.trailing_percentage)
+                        if new_sl < pos['sl']:
                             pos['sl'] = new_sl
 
-                    if (side == 'buy' and last_price >= pos['tp']) or \
-                       (side == 'sell' and last_price <= pos['tp']):
+                    # Vérifie SL ou TP
+                    if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
+                       (pos['side'] == 'sell' and last_price <= pos['tp']):
                         msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
-                        close = True
                         self.win_count += 1
-                    elif (side == 'buy' and last_price <= pos['sl']) or \
-                         (side == 'sell' and last_price >= pos['sl']):
-                        msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
                         close = True
+                    elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
+                         (pos['side'] == 'sell' and last_price >= pos['sl']):
+                        msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
                         self.loss_count += 1
+                        close = True
                     else:
                         close = False
 
                     if close:
-                        close_side = 'sell' if side == 'buy' else 'buy'
-                        self.exchange.create_order(pos['symbol'], 'market', close_side, pos['amount'])
+                        side = 'sell' if pos['side'] == 'buy' else 'buy'
+                        self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
                         self.positions.remove(pos)
-                        self.notifier.send_message(msg + f" | Gain: {self.win_count}, Perte: {self.loss_count}", '📄')
-
+                        self.notifier.send_message(msg, '📤')
                 except Exception as e:
                     logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
             time.sleep(15)
+
 
 
 
