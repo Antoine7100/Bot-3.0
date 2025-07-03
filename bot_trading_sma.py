@@ -219,7 +219,6 @@ class BotTrader:
                 try:
                     last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
 
-                    # Trailing stop dynamique (en %)
                     if pos['side'] == 'buy' and last_price > pos['entry']:
                         new_sl = last_price * (1 - self.trailing_percentage)
                         if new_sl > pos['sl']:
@@ -229,7 +228,6 @@ class BotTrader:
                         if new_sl < pos['sl']:
                             pos['sl'] = new_sl
 
-                    # Vérifie SL ou TP
                     if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
                        (pos['side'] == 'sell' and last_price <= pos['tp']):
                         msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
@@ -251,6 +249,7 @@ class BotTrader:
                 except Exception as e:
                     logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
             time.sleep(15)
+
 
 
 
