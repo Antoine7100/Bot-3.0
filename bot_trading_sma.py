@@ -52,11 +52,13 @@ class TelegramNotifier:
                 ],
                 [
                     {"text": "Fermer positions", "callback_data": "/closeall"}
+                ],
+                [
+                    {"text": "🔄 Sync", "callback_data": "/sync"}
                 ]
             ]
         }
-        self.send_message("🛠️ Menu de contrôle du bot", '🗌', reply_markup=keyboard)
-
+        self.send_message("🛠️ Menu de contrôle du bot", '🗜️', reply_markup=keyboard)
 
 class BotTrader:
     def __init__(self):
@@ -74,9 +76,27 @@ class BotTrader:
         self.notifier = TelegramNotifier()
         self.positions = []
 
+    def sync_with_exchange(self):
+        try:
+            # Récupère les vraies positions ouvertes sur Bybit
+            open_positions = self.exchange.fetch_positions()
+            open_symbols = set(
+                pos['info']['symbol'] for pos in open_positions if float(pos['info']['size']) > 0
+            )
+
+            before = len(self.positions)
+            self.positions = [p for p in self.positions if p['symbol'].replace("/", "") in open_symbols]
+            after = len(self.positions)
+
+            self.notifier.send_message(f"🔁 Sync terminée. Avant: {before}, Après: {after}")
+        except Exception as e:
+            logging.error(f"Erreur de synchronisation : {e}")
+            self.notifier.send_message("❌ Erreur lors de la synchronisation avec Bybit.")
+
     def start_bot(self):
         if not self.is_running:
             self.is_running = True
+            self.sync_with_exchange()
             self.notifier.send_message("🚦 Bot Smart Scalper lancé", '🟢')
             Thread(target=self.run_bot, daemon=True).start()
             Thread(target=self.monitor_positions, daemon=True).start()
@@ -257,6 +277,8 @@ class BotTrader:
             self.notifier.send_message(infos, 'ℹ️')
         elif command == '/menu':
             self.notifier.send_menu()
+        elif command == '/sync':
+            self.sync_with_exchange()
         elif command == '/increase':
             self.trade_amount += 5
             self.notifier.send_message(f"💵 Nouveau montant : {self.trade_amount} USDT")
