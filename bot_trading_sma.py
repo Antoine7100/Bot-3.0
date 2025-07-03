@@ -181,22 +181,13 @@ class BotTrader:
         while self.is_running:
             for symbol in self.symbols:
                 try:
-                    current_hour = datetime.utcnow().hour
-                    if symbol == "ADA/USDT" and current_hour in [0, 1, 2, 3, 4]:
-                        continue
-
                     data = self.exchange.fetch_ohlcv(symbol, '1m', limit=30)
                     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
                     df['ema5'] = df['close'].ewm(span=5).mean()
                     df['ema20'] = df['close'].ewm(span=20).mean()
-                    df['high_break'] = df['high'].rolling(window=20).max()
-                    df['low_break'] = df['low'].rolling(window=20).min()
-                    df['atr'] = df['high'] - df['low']
-                    avg_atr = df['atr'].rolling(window=14).mean().iloc[-1]
-                    if avg_atr < 0.002:
-                        continue
-
+                    df['high_break'] = df['high'].rolling(window=10).max()
+                    df['low_break'] = df['low'].rolling(window=10).min()
                     delta = df['close'].diff()
                     gain = delta.where(delta > 0, 0).rolling(14).mean()
                     loss = -delta.where(delta < 0, 0).rolling(14).mean()
@@ -210,10 +201,11 @@ class BotTrader:
                     ema20 = df['ema20'].iloc[-1]
                     rsi = df['rsi'].iloc[-1]
                     volume = df['volume'].iloc[-1]
+                    avg_volume = df['volume'].mean()
 
-                    if price > high_break and ema5 > ema20 and rsi > 60 and volume > 100:
+                    if price > high_break and ema5 > ema20 and rsi > 60 and volume > avg_volume * 1.2:
                         self.enter_trade(symbol, 'buy')
-                    elif price < low_break and ema5 < ema20 and rsi < 40 and volume > 100:
+                    elif price < low_break and ema5 < ema20 and rsi < 40 and volume > avg_volume * 1.2:
                         self.enter_trade(symbol, 'sell')
                 except Exception as e:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
