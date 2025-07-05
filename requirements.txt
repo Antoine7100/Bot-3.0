@@ -5,3 +5,5 @@ Flask
 gunicorn
 python-telegram-bot==20.3
 requests
+pycares>=4.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
+urllib3>=2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
