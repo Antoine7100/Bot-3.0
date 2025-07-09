@@ -1,5 +1,5 @@
 {
-  "symbols": ["DOGE/USDT",  "BTC/USDT"],
+  "symbols": ["DOGE/USDT"],
   "stake_amount": 10,
   "tp_percentage": 0.012,
   "sl_percentage": 0.008,
