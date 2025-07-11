@@ -130,34 +130,37 @@ class BotTrader:
             Thread(target=self.monitor_positions, daemon=True).start()
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
+    
     def enter_trade(self, symbol, side='buy'):
-        if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
-            if symbol not in self.notifier.silent_notifications:
-                self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
-                self.notifier.silent_notifications.add(symbol)
-            return
+        try:
+            price = self.exchange.fetch_ticker(symbol)['last']
+            adjusted_amount = max(5 / price, self.trade_amount)
+            order_value = price * adjusted_amount
 
-        price = self.exchange.fetch_ticker(symbol)['last']
-        adjusted_amount = max(5 / price, self.trade_amount)
-        order_value = price * adjusted_amount
+            if order_value < 5:
+                return
 
-        if order_value < 5:
-            return
+            tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+            sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
 
-        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+            order = self.exchange.create_order(symbol, 'market', side, adjusted_amount)
 
-        self.positions.append({
-            'symbol': symbol,
-            'side': side,
-            'entry': price,
-            'tp': tp,
-            'sl': sl,
-            'amount': adjusted_amount
-        })
+            if order:
+                self.positions.append({
+                    'symbol': symbol,
+                    'side': side,
+                    'entry': price,
+                    'tp': tp,
+                    'sl': sl,
+                    'amount': adjusted_amount
+                })
+                self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
+            else:
+                self.notifier.send_message(f"⚠️ Échec ouverture position pour {symbol} (aucune réponse de Bybit)", "❗")
 
-        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
-        self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
+        except Exception as e:
+            logging.error(f"Erreur d'ouverture de trade {symbol} : {e}")
+            self.notifier.send_message(f"❌ Erreur d'ouverture de trade pour {symbol} : {e}", '⚠️')
 
     def stop_bot(self):
         self.is_running = False
