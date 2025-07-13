@@ -13,14 +13,14 @@ from datetime import datetime
 # Chargement de la config
 with open("config.json") as f:
     config = json.load(f)
-    
+
 # Chargement des stats
 if os.path.exists("stats.json"):
     with open("stats.json") as sf:
         saved_stats = json.load(sf)
 else:
     saved_stats = {"win_count": 0, "loss_count": 0}
-    
+
 # Configuration logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -30,7 +30,7 @@ class TelegramNotifier:
     def __init__(self):
         self.token = os.getenv('TELEGRAM_TOKEN')
         self.chat_id = os.getenv('TELEGRAM_CHAT_ID')
-        self.silent_notifications = set()  # Symboles déjà notifiés pour trade ouvert
+        self.silent_notifications = set()
 
     def send_message(self, message, emoji='💬', reply_markup=None):
         try:
@@ -44,7 +44,7 @@ class TelegramNotifier:
             headers = {'Content-Type': 'application/json'}
             requests.post(url, headers=headers, data=json.dumps(payload))
         except Exception as e:
-            logging.error(f"Erreur envoi Telegram : {e}")
+            logging.warning(f"Erreur Telegram ignorée : {e}")
 
     def send_menu(self):
         keyboard = {
@@ -59,9 +59,7 @@ class TelegramNotifier:
                     {"text": "Montant -5 USDT", "callback_data": "/decrease"}
                 ],
                 [
-                    {"text": "Fermer positions", "callback_data": "/closeall"}
-                ],
-                [
+                    {"text": "Fermer positions", "callback_data": "/closeall"},
                     {"text": "🔄 Sync", "callback_data": "/sync"}
                 ],
                 [
@@ -78,11 +76,11 @@ class BotTrader:
             'secret': os.getenv('BYBIT_API_SECRET'),
             'options': {'createMarketBuyOrderRequiresPrice': False}
         })
-        self.symbols = config["symbols"]
+        self.symbols = [s for s in config["symbols"] if not s.startswith("ADA")]
         self.trade_amount = config["stake_amount"]
         self.tp_percentage = 0.012
         self.sl_percentage = 0.008
-        self.trailing_percentage = 0.003  # 0.3% trailing stop
+        self.trailing_percentage = 0.003
         self.trades_file = config["trades_file"]
         self.is_running = False
         self.notifier = TelegramNotifier()
@@ -93,19 +91,16 @@ class BotTrader:
     def save_stats(self):
         with open("stats.json", "w") as f:
             json.dump({"win_count": self.win_count, "loss_count": self.loss_count}, f)
-            
+
     def sync_with_exchange(self):
         try:
-            # Récupère les vraies positions ouvertes sur Bybit
             open_positions = self.exchange.fetch_positions()
             open_symbols = set(
                 pos['info']['symbol'] for pos in open_positions if float(pos['info']['size']) > 0
             )
-
             before = len(self.positions)
             self.positions = [p for p in self.positions if p['symbol'].replace("/", "") in open_symbols]
             after = len(self.positions)
-
             self.notifier.send_message(f"🔁 Sync terminée. Avant: {before}, Après: {after}")
         except Exception as e:
             logging.error(f"Erreur de synchronisation : {e}")
@@ -121,74 +116,64 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
 
-    def start_bot(self):
-        if not self.is_running:
-            logging.info("✅ start_bot() appelé")
-            self.is_running = True
-            self.notifier.send_message("🚦 Le bot a bien été lancé et commence à analyser les marchés.", '🟢')
-            Thread(target=self.run_bot, daemon=True).start()
-            Thread(target=self.monitor_positions, daemon=True).start()
-        else:
-            self.notifier.send_message("⚠️ Le bot est déjà en marche.")
-    
     def enter_trade(self, symbol, side='buy'):
-        try:
-            price = self.exchange.fetch_ticker(symbol)['last']
-            adjusted_amount = max(5 / price, self.trade_amount)
-            order_value = price * adjusted_amount
-
-            if order_value < 5:
-                return
-
-            tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-            sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
-
-            order = self.exchange.create_order(symbol, 'market', side, adjusted_amount)
-
-            if order:
-                self.positions.append({
-                    'symbol': symbol,
-                    'side': side,
-                    'entry': price,
-                    'tp': tp,
-                    'sl': sl,
-                    'amount': adjusted_amount
-                })
-                self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
-            else:
-                self.notifier.send_message(f"⚠️ Échec ouverture position pour {symbol} (aucune réponse de Bybit)", "❗")
-
-        except Exception as e:
-            logging.error(f"Erreur d'ouverture de trade {symbol} : {e}")
-            self.notifier.send_message(f"❌ Erreur d'ouverture de trade pour {symbol} : {e}", '⚠️')
-
-    def stop_bot(self):
-        self.is_running = False
-        self.notifier.send_message("🔝 Bot arrêté", '🔴')
-
-    def close_all_positions(self):
-        if not self.positions:
-            self.notifier.send_message("❗Aucune position à fermer.")
+        if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
+            if symbol not in self.notifier.silent_notifications:
+                self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
+                self.notifier.silent_notifications.add(symbol)
             return
 
-        for pos in self.positions[:]:
-            try:
-                price = self.exchange.fetch_ticker(pos['symbol'])['last']
-                adjusted_amount = max(5 / price, pos['amount'])
-                order_value = price * adjusted_amount
+        price = self.exchange.fetch_ticker(symbol)['last']
+        adjusted_amount = max(5 / price, self.trade_amount)
+        order_value = price * adjusted_amount
 
-                if order_value < 5:
-                    logging.warning(f"❌ Fermeture ignorée : {pos['symbol']}, montant trop faible ({order_value:.2f} USDT)")
-                    self.notifier.send_message(f"❌ Montant trop faible pour clôturer {pos['symbol']} ({order_value:.2f} USDT).", "⚠️")
-                    continue
+        if order_value < 5:
+            return
 
-                closing_side = 'sell' if pos['side'] == 'buy' else 'buy'
-                self.exchange.create_order(pos['symbol'], 'market', closing_side, adjusted_amount)
-                self.positions.remove(pos)
-                self.notifier.send_message(f"🔒 Fermeture manuelle de {pos['symbol']} ({pos['side']})")
-            except Exception as e:
-                logging.error(f"❌ Erreur fermeture {pos['symbol']} : {e}")
-                self.notifier.send_message(f"❌ Erreur fermeture {pos['symbol']} : {e}", '⚠️')
+        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+
+        self.positions.append({
+            'symbol': symbol,
+            'side': side,
+            'entry': price,
+            'tp': tp,
+            'sl': sl,
+            'amount': adjusted_amount
+        })
+
+        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
+        self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
+
+    def monitor_positions(self):
+        while self.is_running:
+            for pos in self.positions[:]:
+                try:
+                    last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
+
+                    if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
+                       (pos['side'] == 'sell' and last_price <= pos['tp']):
+                        self.win_count += 1
+                        msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
+                        close = True
+                    elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
+                         (pos['side'] == 'sell' and last_price >= pos['sl']):
+                        self.loss_count += 1
+                        msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
+                        close = True
+                    else:
+                        close = False
+
+                    if close:
+                        side = 'sell' if pos['side'] == 'buy' else 'buy'
+                        self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
+                        self.positions.remove(pos)
+                        self.notifier.send_message(msg, '📤')
+                        self.save_stats()
+
+                except Exception as e:
+                    logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
+            time.sleep(15)
 
     def run_bot(self):
         while self.is_running:
@@ -214,89 +199,14 @@ class BotTrader:
                     ema20 = df['ema20'].iloc[-1]
                     rsi = df['rsi'].iloc[-1]
                     volume = df['volume'].iloc[-1]
-                    avg_volume = df['volume'].mean()
 
-                    if price > high_break and ema5 > ema20 and rsi > 60 and volume > avg_volume * 1.2:
+                    if price > high_break and ema5 > ema20 and rsi > 55 and volume > 100:
                         self.enter_trade(symbol, 'buy')
-                    elif price < low_break and ema5 < ema20 and rsi < 40 and volume > avg_volume * 1.2:
+                    elif price < low_break and ema5 < ema20 and rsi < 45 and volume > 100:
                         self.enter_trade(symbol, 'sell')
                 except Exception as e:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
             time.sleep(10)
-
-
-
-    def monitor_positions(self):
-        while self.is_running:
-            for pos in self.positions[:]:
-                try:
-                    last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
-
-                    if pos['side'] == 'buy' and last_price > pos['entry']:
-                        new_sl = last_price * (1 - self.trailing_percentage)
-                        if new_sl > pos['sl']:
-                            pos['sl'] = new_sl
-                    elif pos['side'] == 'sell' and last_price < pos['entry']:
-                        new_sl = last_price * (1 + self.trailing_percentage)
-                        if new_sl < pos['sl']:
-                            pos['sl'] = new_sl
-
-                    if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
-                       (pos['side'] == 'sell' and last_price <= pos['tp']):
-                        msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
-                        self.win_count += 1
-                        self.save_stats()
-                        close = True
-                    elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
-                         (pos['side'] == 'sell' and last_price >= pos['sl']):
-                        msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
-                        self.loss_count += 1
-                        self.save_stats()
-                        close = True
-                    else:
-                        close = False
-
-                    if close:
-                        side = 'sell' if pos['side'] == 'buy' else 'buy'
-                        self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
-                        self.positions.remove(pos)
-                        self.notifier.send_message(msg, '📤')
-                except Exception as e:
-                    logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
-            time.sleep(15)
-
-
-    def place_order(self, symbol, side, amount):
-        try:
-            price = self.exchange.fetch_ticker(symbol)['last']
-            order_value = price * amount
-            min_order_usdt = 5
-
-            if order_value < min_order_usdt:
-                logging.warning(f"❌ Ordre ignoré : {symbol}, montant trop faible ({order_value:.2f} USDT)")
-                return
-
-            logging.info(f"📤 Envoi ordre {side.upper()} sur {symbol} avec {amount} USDT")
-            order = self.exchange.create_order(symbol, 'market', side, amount)
-            logging.info(f"✅ Réponse de Bybit : {order}")
-
-            price = order.get('price', price)
-            tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-            sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
-
-            self.positions.append({'symbol': symbol, 'side': side, 'tp': tp, 'sl': sl})
-            with open(self.trades_file, 'a') as f:
-                json.dump({"symbol": symbol, "side": side, "price": price, "tp": tp, "sl": sl}, f)
-                f.write("\n")
-
-            self.notifier.send_message(
-                f"✅ Nouvelle position {side.upper()} sur {symbol} à {price:.4f}\n🎯 TP: {tp:.4f} / 🛑 SL: {sl:.4f}",
-                emoji="📌"
-            )
-
-        except Exception as e:
-            logging.error(f"❌ Erreur order {symbol} : {e}")
-            self.notifier.send_message(f"❌ Erreur ordre {symbol} : {e}", emoji="⚠️")
 
     def handle_telegram_command(self, command):
         if command == '/start':
@@ -340,7 +250,8 @@ class BotTrader:
             else:
                 msg = "📊 Aucune statistique disponible pour l’instant."
             self.notifier.send_message(msg, '📊')
-
+        else:
+            self.notifier.send_message("Commande non reconnue.", '❗')
 
 bot = BotTrader()
 
