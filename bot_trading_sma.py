@@ -66,7 +66,7 @@ class TelegramNotifier:
                     {"text": "📊 Stats", "callback_data": "/stats"}
                 ],
                 [
-                    {"text": "📌 Positions", "callback_data": "/positions"}
+                    {"text": "📂 Positions", "callback_data": "/positions"}
                 ],
             ]
         }
