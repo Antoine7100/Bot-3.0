@@ -50,27 +50,25 @@ class TelegramNotifier:
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "Démarrer", "callback_data": "/start"},
-                    {"text": "Arrêter", "callback_data": "/stop"}
+                    {"text": "▶️ Démarrer", "callback_data": "/start"},
+                    {"text": "⏹️ Arrêter", "callback_data": "/stop"}
                 ],
                 [
-                    {"text": "Statut", "callback_data": "/status"},
-                    {"text": "Montant +5 USDT", "callback_data": "/increase"},
-                    {"text": "Montant -5 USDT", "callback_data": "/decrease"}
+                    {"text": "📊 Statut", "callback_data": "/status"},
+                    {"text": "💵 +5 USDT", "callback_data": "/increase"},
+                    {"text": "💸 -5 USDT", "callback_data": "/decrease"}
                 ],
                 [
-                    {"text": "Fermer positions", "callback_data": "/closeall"},
-                    {"text": "🔄 Sync", "callback_data": "/sync"}
+                    {"text": "📂 Positions", "callback_data": "/positions"},
+                    {"text": "📈 Stats", "callback_data": "/stats"}
                 ],
                 [
-                    {"text": "📊 Stats", "callback_data": "/stats"}
-                ],
-                [
-                    {"text": "📂 Positions", "callback_data": "/positions"}
-                ],
+                    {"text": "🔁 Sync", "callback_data": "/sync"},
+                    {"text": "❌ Fermer positions", "callback_data": "/closeall"}
+                ]
             ]
         }
-        self.send_message("🛠️ Menu de contrôle du bot", '🕜', reply_markup=keyboard)
+        self.send_message("🛠️ Menu de contrôle du bot", '🧠', reply_markup=keyboard)
 
 class BotTrader:
     def __init__(self):
