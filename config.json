@@ -1,7 +1,15 @@
 {
-  "symbols": ["DOGE/USDT", "BTC/USDT"],
+  "symbols": [
+    "DOGE/USDT",
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "XRP/USDT"
+  ],
   "stake_amount": 10,
-  "tp_percentage": 0.012,  
+  "tp_percentage": 0.012,
   "sl_percentage": 0.008,
+  "trailing_percentage": 0.003,
+  "leverage": 5,
   "trades_file": "trades.json"
 }
