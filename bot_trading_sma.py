@@ -64,7 +64,10 @@ class TelegramNotifier:
                 ],
                 [
                     {"text": "📊 Stats", "callback_data": "/stats"}
-                ]
+                ],
+                [
+                    {"text": "📌 Positions", "callback_data": "/positions"}
+                ],
             ]
         }
         self.send_message("🛠️ Menu de contrôle du bot", '🕜', reply_markup=keyboard)
@@ -251,7 +254,29 @@ class BotTrader:
             self.notifier.send_message(msg, '📊')
         else:
             self.notifier.send_message("Commande non reconnue.", '❗')
+        elif command == '/positions':
+    if not self.positions:
+        self.notifier.send_message("📭 Aucune position en cours.")
+        return
 
+    msg = "📌 *Positions ouvertes* :\n"
+    for pos in self.positions:
+        symbol = pos['symbol']
+        side = pos['side']
+        entry = pos['entry']
+        tp = pos['tp']
+        sl = pos['sl']
+        amount = pos['amount']
+        value = amount * entry
+        msg += (
+            f"\n🔸 {symbol} [{side.upper()}]\n"
+            f"   📥 Entrée : {entry:.4f}\n"
+            f"   📊 Quantité : {amount:.4f} {symbol.split('/')[0]}\n"
+            f"   💰 Montant : {value:.2f} USDT\n"
+            f"   🎯 TP : {tp:.4f} | 🛑 SL : {sl:.4f}\n"
+        )
+
+    self.notifier.send_message(msg, '📋')
 bot = BotTrader()
 
 @app.route('/')
