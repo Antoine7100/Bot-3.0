@@ -177,7 +177,6 @@ class BotTrader:
             time.sleep(15)
 
     def run_bot(self):
-        self.notifier.send_message("🟢📈 Bot Smart Scalper amélioré lancé")
         self.is_running = True
 
         while self.is_running:
