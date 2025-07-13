@@ -177,37 +177,74 @@ class BotTrader:
             time.sleep(15)
 
     def run_bot(self):
+        self.notifier.send_message("🟢📈 Bot Smart Scalper amélioré lancé")
+        self.is_running = True
+
         while self.is_running:
             for symbol in self.symbols:
                 try:
-                    data = self.exchange.fetch_ohlcv(symbol, '1m', limit=30)
-                    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    if any(p['symbol'] == symbol for p in self.positions):
+                        continue
 
-                    df['ema5'] = df['close'].ewm(span=5).mean()
-                    df['ema20'] = df['close'].ewm(span=20).mean()
-                    df['high_break'] = df['high'].rolling(window=10).max()
-                    df['low_break'] = df['low'].rolling(window=10).min()
-                    delta = df['close'].diff()
+                    df1 = pd.DataFrame(self.exchange.fetch_ohlcv(symbol, '1m', limit=50), columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    df5 = pd.DataFrame(self.exchange.fetch_ohlcv(symbol, '5m', limit=50), columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+
+                    # Indicators
+                    df1['ema5'] = df1['close'].ewm(span=5).mean()
+                    df1['ema20'] = df1['close'].ewm(span=20).mean()
+                    delta = df1['close'].diff()
                     gain = delta.where(delta > 0, 0).rolling(14).mean()
                     loss = -delta.where(delta < 0, 0).rolling(14).mean()
                     rs = gain / loss
-                    df['rsi'] = 100 - (100 / (1 + rs))
+                    df1['rsi'] = 100 - (100 / (1 + rs))
+                    df1['ema12'] = df1['close'].ewm(span=12).mean()
+                    df1['ema26'] = df1['close'].ewm(span=26).mean()
+                    df1['macd'] = df1['ema12'] - df1['ema26']
+                    df1['signal'] = df1['macd'].ewm(span=9).mean()
+                    df1['high_break'] = df1['high'].rolling(window=10).max()
+                    df1['low_break'] = df1['low'].rolling(window=10).min()
+                    ha_close = (df1['open'] + df1['high'] + df1['low'] + df1['close']) / 4
+                    ha_open = (df1['open'].shift(1) + df1['close'].shift(1)) / 2
+                    df1['ha_open'] = ha_open
+                    df1['ha_close'] = ha_close
 
-                    price = df['close'].iloc[-1]
-                    high_break = df['high_break'].iloc[-2]
-                    low_break = df['low_break'].iloc[-2]
-                    ema5 = df['ema5'].iloc[-1]
-                    ema20 = df['ema20'].iloc[-1]
-                    rsi = df['rsi'].iloc[-1]
-                    volume = df['volume'].iloc[-1]
+                    df5['ema5'] = df5['close'].ewm(span=5).mean()
+                    df5['ema20'] = df5['close'].ewm(span=20).mean()
 
-                    if price > high_break and ema5 > ema20 and rsi > 55 and volume > 100:
+                    price = df1['close'].iloc[-1]
+                    ema5 = df1['ema5'].iloc[-1]
+                    ema20 = df1['ema20'].iloc[-1]
+                    rsi = df1['rsi'].iloc[-1]
+                    macd = df1['macd'].iloc[-1]
+                    signal_macd = df1['signal'].iloc[-1]
+                    ha_color = "green" if df1['ha_close'].iloc[-1] > df1['ha_open'].iloc[-1] else "red"
+                    volume = df1['volume'].iloc[-1]
+                    high_break = df1['high_break'].iloc[-2]
+                    low_break = df1['low_break'].iloc[-2]
+                    bullish_5m = df5['ema5'].iloc[-1] > df5['ema20'].iloc[-1]
+                    bearish_5m = df5['ema5'].iloc[-1] < df5['ema20'].iloc[-1]
+
+                    if (price > high_break and
+                        ema5 > ema20 and
+                        rsi > 55 and
+                        macd > signal_macd and
+                        ha_color == "green" and
+                        bullish_5m and
+                        volume > 100):
                         self.enter_trade(symbol, 'buy')
-                    elif price < low_break and ema5 < ema20 and rsi < 45 and volume > 100:
+
+                    elif (price < low_break and
+                          ema5 < ema20 and
+                          rsi < 45 and
+                          macd < signal_macd and
+                          ha_color == "red" and
+                          bearish_5m and
+                          volume > 100):
                         self.enter_trade(symbol, 'sell')
+
                 except Exception as e:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
-            time.sleep(10)
+            time.sleep(12)
     def handle_telegram_command(self, command):
         if command == '/start':
             self.start_bot()
