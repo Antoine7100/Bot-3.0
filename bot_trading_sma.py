@@ -211,37 +211,40 @@ class BotTrader:
     def handle_telegram_command(self, command):
         if command == '/start':
             self.start_bot()
+
         elif command == '/stop':
             self.is_running = False
             self.notifier.send_message("⛔ Bot arrêté", '🔴')
+
         elif command == '/status':
             running = "✅ Actif" if self.is_running else "❌ Inactif"
             infos = f"Statut : {running}\nMontant par trade : {self.trade_amount} USDT\nPositions : {len(self.positions)}"
             self.notifier.send_message(infos, 'ℹ️')
+
         elif command == '/menu':
             self.notifier.send_menu()
+
         elif command == '/sync':
             self.sync_with_exchange()
+
         elif command == '/increase':
             self.trade_amount += 5
             self.notifier.send_message(f"💵 Nouveau montant : {self.trade_amount} USDT")
+
         elif command == '/decrease':
             self.trade_amount = max(5, self.trade_amount - 5)
             self.notifier.send_message(f"💸 Nouveau montant : {self.trade_amount} USDT")
+
         elif command == '/closeall':
             for pos in self.positions[:]:
                 try:
                     side = 'sell' if pos['side'] == 'buy' else 'buy'
-                    self.exchange.create_order(
-                        pos['symbol'],
-                        'market',
-                        side,
-                        pos['amount']
-                    )
+                    self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
                     self.positions.remove(pos)
                     self.notifier.send_message(f"🔐 Fermeture forcée de {pos['symbol']}", '⚠️')
                 except Exception as e:
                     logging.error(f"Erreur fermeture forcée {pos['symbol']} : {e}")
+
         elif command == '/stats':
             total = self.win_count + self.loss_count
             if total > 0:
@@ -255,7 +258,8 @@ class BotTrader:
             else:
                 msg = "📊 Aucune statistique disponible pour l’instant."
             self.notifier.send_message(msg, '📊')
-          elif command == '/positions':
+
+        elif command == '/positions':
             if not self.positions:
                 self.notifier.send_message("📭 Aucune position ouverte pour l'instant.", '📌')
             else:
@@ -267,9 +271,10 @@ class BotTrader:
                         f"  📈 TP : {pos['tp']:.4f} | 🛑 SL : {pos['sl']:.4f}\n"
                         f"  💰 Montant : {pos['amount']:.3f}\n\n"
                     )
-                self.notifier.send_message(msg, '📍')     
+                self.notifier.send_message(msg, '📍')
+
         else:
-            self.notifier.send_message("Commande non reconnue.", '❗')            
+            self.notifier.send_message("Commande non reconnue.", '❗')      
 bot = BotTrader()
 
 @app.route('/')
