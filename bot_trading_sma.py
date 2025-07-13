@@ -257,6 +257,19 @@ class BotTrader:
             else:
                 msg = "📊 Aucune statistique disponible pour l’instant."
             self.notifier.send_message(msg, '📊')
+          elif command == '/positions':
+            if not self.positions:
+                self.notifier.send_message("📭 Aucune position ouverte pour l'instant.", '📌')
+            else:
+                msg = "📂 *Positions en cours* :\n"
+                for pos in self.positions:
+                    msg += (
+                        f"🔹 {pos['symbol']} - {pos['side'].upper()}\n"
+                        f"  🎯 Entrée : {pos['entry']:.4f}\n"
+                        f"  📈 TP : {pos['tp']:.4f} | 🛑 SL : {pos['sl']:.4f}\n"
+                        f"  💰 Montant : {pos['amount']:.3f}\n\n"
+                    )
+                self.notifier.send_message(msg, '📍')     
         else:
             self.notifier.send_message("Commande non reconnue.", '❗')            
 bot = BotTrader()
