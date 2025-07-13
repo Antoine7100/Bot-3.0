@@ -179,34 +179,43 @@ class BotTrader:
         while self.is_running:
             for symbol in self.symbols:
                 try:
-                    data = self.exchange.fetch_ohlcv(symbol, '1m', limit=30)
-                    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    # Données en 1m
+                    data_1m = self.exchange.fetch_ohlcv(symbol, '1m', limit=50)
+                    df_1m = pd.DataFrame(data_1m, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
-                    df['ema5'] = df['close'].ewm(span=5).mean()
-                    df['ema20'] = df['close'].ewm(span=20).mean()
-                    df['high_break'] = df['high'].rolling(window=10).max()
-                    df['low_break'] = df['low'].rolling(window=10).min()
-                    delta = df['close'].diff()
-                    gain = delta.where(delta > 0, 0).rolling(14).mean()
-                    loss = -delta.where(delta < 0, 0).rolling(14).mean()
-                    rs = gain / loss
-                    df['rsi'] = 100 - (100 / (1 + rs))
+                    # Données en 15m pour confirmer la tendance
+                    data_15m = self.exchange.fetch_ohlcv(symbol, '15m', limit=50)
+                    df_15m = pd.DataFrame(data_15m, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
-                    price = df['close'].iloc[-1]
-                    high_break = df['high_break'].iloc[-2]
-                    low_break = df['low_break'].iloc[-2]
-                    ema5 = df['ema5'].iloc[-1]
-                    ema20 = df['ema20'].iloc[-1]
-                    rsi = df['rsi'].iloc[-1]
-                    volume = df['volume'].iloc[-1]
+                    df_1m['ema10'] = df_1m['close'].ewm(span=10).mean()
+                    df_1m['ema20'] = df_1m['close'].ewm(span=20).mean()
+                    df_1m['atr'] = df_1m['high'].rolling(14).max() - df_1m['low'].rolling(14).min()
 
-                    if price > high_break and ema5 > ema20 and rsi > 55 and volume > 100:
+                    df_15m['ema10'] = df_15m['close'].ewm(span=10).mean()
+                    df_15m['ema20'] = df_15m['close'].ewm(span=20).mean()
+
+                    price = df_1m['close'].iloc[-1]
+                    ema10_1m = df_1m['ema10'].iloc[-1]
+                    ema20_1m = df_1m['ema20'].iloc[-1]
+                    atr = df_1m['atr'].iloc[-1]
+
+                    ema10_15m = df_15m['ema10'].iloc[-1]
+                    ema20_15m = df_15m['ema20'].iloc[-1]
+
+                if atr == 0 or pd.isna(atr):
+                    continue  # éviter division par zéro
+
+                # Confirmation de tendance sur 15m
+                if ema10_15m > ema20_15m:
+                    if price > ema10_1m > ema20_1m:
                         self.enter_trade(symbol, 'buy')
-                    elif price < low_break and ema5 < ema20 and rsi < 45 and volume > 100:
+                elif ema10_15m < ema20_15m:
+                    if price < ema10_1m < ema20_1m:
                         self.enter_trade(symbol, 'sell')
-                except Exception as e:
-                    logging.error(f"Erreur run_bot pour {symbol} : {e}")
-            time.sleep(10)
+
+            except Exception as e:
+                logging.error(f"Erreur run_bot pour {symbol} : {e}")
+        time.sleep(10)
 
     def handle_telegram_command(self, command):
         if command == '/start':
