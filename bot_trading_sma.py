@@ -124,8 +124,7 @@ class BotTrader:
                 self.notifier.silent_notifications.add(symbol)
             return
 
-        ticker = self.exchange.fetch_ticker(symbol)
-        price = ticker['last']
+        price = self.exchange.fetch_ticker(symbol)['last']
         adjusted_amount = max(5 / price, self.trade_amount)
         order_value = price * adjusted_amount
 
@@ -135,21 +134,11 @@ class BotTrader:
         tp_price = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
         sl_price = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
 
-        # Ouvre la position au marché
         self.exchange.create_order(symbol, 'market', side, adjusted_amount)
 
-        # Crée TP et SL en tant qu’ordres limités
         opposite_side = 'sell' if side == 'buy' else 'buy'
-
-        try:
-            # TP
-            self.exchange.create_order(symbol, 'limit', opposite_side, adjusted_amount, tp_price)
-            # SL
-            self.exchange.create_order(symbol, 'stop_market', opposite_side, adjusted_amount, None, {
-                'stopPrice': sl_price
-            })
-        except Exception as e:
-            logging.error(f"Erreur lors de la création du TP/SL : {e}")
+        self.exchange.create_order(symbol, 'takeProfitMarket', opposite_side, adjusted_amount, {'stopPrice': tp_price})
+        self.exchange.create_order(symbol, 'stopMarket', opposite_side, adjusted_amount, {'stopPrice': sl_price})
 
         self.positions.append({
             'symbol': symbol,
@@ -160,14 +149,17 @@ class BotTrader:
             'amount': adjusted_amount
         })
 
-        self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp_price:.4f}, SL: {sl_price:.4f}", '💥'))
+        self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp_price:.4f}, SL: {sl_price:.4f}", '💥')
 
     def monitor_positions(self):
         while self.is_running:
-            for pos in self.positions[:]:
-                try:
-                    last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
+            try:
+                for pos in self.positions[:]:
+                    open_orders = self.exchange.fetch_open_orders(pos['symbol'])
+                    if open_orders:
+                        continue
 
+                    last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
                     if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
                        (pos['side'] == 'sell' and last_price <= pos['tp']):
                         self.win_count += 1
@@ -187,9 +179,8 @@ class BotTrader:
                         self.positions.remove(pos)
                         self.notifier.send_message(msg, '📤')
                         self.save_stats()
-
-                except Exception as e:
-                    logging.error(f"Erreur monitor pour {pos['symbol']} : {e}")
+            except Exception as e:
+                logging.error(f"Erreur monitor_positions : {e}")
             time.sleep(15)
 
     def run_bot(self):
