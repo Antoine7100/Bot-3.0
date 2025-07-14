@@ -124,27 +124,43 @@ class BotTrader:
                 self.notifier.silent_notifications.add(symbol)
             return
 
-        price = self.exchange.fetch_ticker(symbol)['last']
+        ticker = self.exchange.fetch_ticker(symbol)
+        price = ticker['last']
         adjusted_amount = max(5 / price, self.trade_amount)
         order_value = price * adjusted_amount
 
         if order_value < 5:
             return
 
-        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+        tp_price = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+        sl_price = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+
+        # Ouvre la position au marché
+        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
+
+        # Crée TP et SL en tant qu’ordres limités
+        opposite_side = 'sell' if side == 'buy' else 'buy'
+
+        try:
+            # TP
+            self.exchange.create_order(symbol, 'limit', opposite_side, adjusted_amount, tp_price)
+            # SL
+            self.exchange.create_order(symbol, 'stop_market', opposite_side, adjusted_amount, None, {
+                'stopPrice': sl_price
+            })
+        except Exception as e:
+            logging.error(f"Erreur lors de la création du TP/SL : {e}")
 
         self.positions.append({
             'symbol': symbol,
             'side': side,
             'entry': price,
-            'tp': tp,
-            'sl': sl,
+            'tp': tp_price,
+            'sl': sl_price,
             'amount': adjusted_amount
         })
 
-        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
-        self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp:.4f}, SL: {sl:.4f}", '💥')
+        self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp_price:.4f}, SL: {sl_price:.4f}", '💥'))
 
     def monitor_positions(self):
         while self.is_running:
