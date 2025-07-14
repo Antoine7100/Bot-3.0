@@ -96,15 +96,35 @@ class BotTrader:
     def sync_with_exchange(self):
         try:
             open_positions = self.exchange.fetch_positions()
-            open_symbols = set(
-                pos['info']['symbol'] for pos in open_positions if float(pos['info']['size']) > 0
-            )
-            before = len(self.positions)
-            self.positions = [p for p in self.positions if p['symbol'].replace("/", "") in open_symbols]
-            after = len(self.positions)
-            self.notifier.send_message(f"🔁 Sync terminée. Avant: {before}, Après: {after}")
+            synced = 0
+            self.positions = []
+
+            for pos in open_positions:
+                size = float(pos['info']['size'])
+                if size == 0:
+                    continue
+
+                symbol = pos['symbol'].replace("USDT", "/USDT")
+                side = 'buy' if pos['info']['side'].lower() == 'buy' else 'sell'
+                entry_price = float(pos['info']['entryPrice'])
+                amount = size
+
+                tp = entry_price * (1 + self.tp_percentage) if side == 'buy' else entry_price * (1 - self.tp_percentage)
+                sl = entry_price * (1 - self.sl_percentage) if side == 'buy' else entry_price * (1 + self.sl_percentage)
+
+                self.positions.append({
+                    'symbol': symbol,
+                    'side': side,
+                    'entry': entry_price,
+                    'tp': tp,
+                    'sl': sl,
+                    'amount': amount
+                })
+                synced += 1
+
+            self.notifier.send_message(f"🔄 Synchronisation terminée. {synced} positions synchronisées depuis Bybit.")
         except Exception as e:
-            logging.error(f"Erreur de synchronisation : {e}")
+            logging.error(f"Erreur sync_with_exchange : {e}")
             self.notifier.send_message("❌ Erreur lors de la synchronisation avec Bybit.")
 
     def start_bot(self):
@@ -131,25 +151,19 @@ class BotTrader:
         if order_value < 5:
             return
 
-        tp_price = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-        sl_price = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
-
-        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
-
-        opposite_side = 'sell' if side == 'buy' else 'buy'
-        self.exchange.create_order(symbol, 'takeProfitMarket', opposite_side, adjusted_amount, {'stopPrice': tp_price})
-        self.exchange.create_order(symbol, 'stopMarket', opposite_side, adjusted_amount, {'stopPrice': sl_price})
+        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
 
         self.positions.append({
             'symbol': symbol,
             'side': side,
             'entry': price,
-            'tp': tp_price,
-            'sl': sl_price,
+            'tp': tp,
+            'sl': sl,
             'amount': adjusted_amount
         })
 
-        self.notifier.send_message(f"📈 {side.upper()} {symbol} à {price:.4f} | TP: {tp_price:.4f}, SL: {sl_price:.4f}", '💥')
+        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
 
     def monitor_positions(self):
         while self.is_running:
