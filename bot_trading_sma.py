@@ -172,37 +172,47 @@ class BotTrader:
             logging.error(f"Erreur lors de l'entrée en position pour {symbol} : {e}")
             
 
-    def monitor_positions(self):
-        while self.is_running:
-            try:
-                for pos in self.positions[:]:
-                    open_orders = self.exchange.fetch_open_orders(pos['symbol'])
-                    if open_orders:
-                        continue
+def monitor_positions(self):
+    while self.is_running:
+        try:
+            for pos in self.positions[:]:
+                last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
 
-                    last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
-                    if (pos['side'] == 'buy' and last_price >= pos['tp']) or \
-                       (pos['side'] == 'sell' and last_price <= pos['tp']):
-                        self.win_count += 1
+                close = False
+                msg = ""
+
+                if pos['side'] == 'buy':
+                    if last_price >= pos['tp']:
                         msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
+                        self.win_count += 1
                         close = True
-                    elif (pos['side'] == 'buy' and last_price <= pos['sl']) or \
-                         (pos['side'] == 'sell' and last_price >= pos['sl']):
-                        self.loss_count += 1
+                    elif last_price <= pos['sl']:
                         msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
+                        self.loss_count += 1
                         close = True
-                    else:
-                        close = False
 
-                    if close:
-                        side = 'sell' if pos['side'] == 'buy' else 'buy'
-                        self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
+                elif pos['side'] == 'sell':
+                    if last_price <= pos['tp']:
+                        msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
+                        self.win_count += 1
+                        close = True
+                    elif last_price >= pos['sl']:
+                        msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
+                        self.loss_count += 1
+                        close = True
+
+                if close:
+                    opposite = 'sell' if pos['side'] == 'buy' else 'buy'
+                    try:
+                        self.exchange.create_order(pos['symbol'], 'market', opposite, pos['amount'])
                         self.positions.remove(pos)
                         self.notifier.send_message(msg, '📤')
                         self.save_stats()
-            except Exception as e:
-                logging.error(f"Erreur monitor_positions : {e}")
-            time.sleep(15)
+                    except Exception as e:
+                        logging.error(f"Erreur lors de la clôture de {pos['symbol']} : {e}")
+        except Exception as e:
+            logging.error(f"Erreur monitor_positions : {e}")
+        time.sleep(15)
 
     def run_bot(self):
         self.is_running = True
