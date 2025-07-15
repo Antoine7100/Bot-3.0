@@ -137,40 +137,39 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
 
-    def enter_trade(self, symbol, side='buy'):
-        if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
-            if symbol not in self.notifier.silent_notifications:
-                self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
-                self.notifier.silent_notifications.add(symbol)
-            return
+def enter_trade(self, symbol, side='buy'):
+    if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
+        if symbol not in self.notifier.silent_notifications:
+            self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
+            self.notifier.silent_notifications.add(symbol)
+        return
 
-        price = self.exchange.fetch_ticker(symbol)['last']
-        adjusted_amount = max(5 / price, self.trade_amount)
-        order_value = price * adjusted_amount
+    price = self.exchange.fetch_ticker(symbol)['last']
+    adjusted_amount = max(5 / price, self.trade_amount)
+    order_value = price * adjusted_amount
 
-        if order_value < 5:
-            return
+    if order_value < 5:
+        return
 
-        tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-        sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
+    tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
+    sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
 
-        self.positions.append({
-            'symbol': symbol,
-            'side': side,
-            'entry': price,
-            'tp': tp,
-            'sl': sl,
-            'amount': adjusted_amount
-        })
+    self.positions.append({
+        'symbol': symbol,
+        'side': side,
+        'entry': price,
+        'tp': tp,
+        'sl': sl,
+        'amount': adjusted_amount
+    })
 
-        self.exchange.create_order(symbol, 'market', side, adjusted_amount)
+    self.exchange.create_order(symbol, 'market', side, adjusted_amount)
 
-        # ✅ Notification d'achat
-        self.notifier.send_message(
-            f"📥 Position ouverte sur {symbol} à {price:.4f}\n"
-            f"🎯 TP : {tp:.4f} | 🛑 SL : {sl:.4f}\n"
-            f"💰 Montant : {adjusted_amount:.3f}", '🟢'
-        )
+    self.notifier.send_message(
+        f"🛒 Nouvelle position : {symbol} ({side.upper()})\n"
+        f"🎯 Entrée : {price:.4f} | TP : {tp:.4f} | SL : {sl:.4f} | Montant : {adjusted_amount:.3f}",
+        "🟢"
+    )
 
     def monitor_positions(self):
         while self.is_running:
