@@ -170,7 +170,7 @@ class BotTrader:
 
         except Exception as e:
             logging.error(f"Erreur lors de l'entrée en position pour {symbol} : {e}")
-            self.notifier.send_message(f"❌ Erreur prise de position sur {symbol}", '⚠️')
+            
 
     def monitor_positions(self):
         while self.is_running:
