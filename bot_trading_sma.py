@@ -100,13 +100,13 @@ class BotTrader:
             self.positions = []
 
             for pos in open_positions:
-                size = float(pos['info']['size'])
-                if size == 0:
-                    continue
+                size = float(pos['info'].get('size', 0))
+                entry_price = float(pos['info'].get('entryPrice', 0))
+                if size == 0 or entry_price == 0:
+                    continue  # Ignore les positions sans taille ou sans prix d'entrée
 
                 symbol = pos['symbol'].replace("USDT", "/USDT")
                 side = 'buy' if pos['info']['side'].lower() == 'buy' else 'sell'
-                entry_price = float(pos['info']['entryPrice'])
                 amount = size
 
                 tp = entry_price * (1 + self.tp_percentage) if side == 'buy' else entry_price * (1 - self.tp_percentage)
@@ -122,7 +122,7 @@ class BotTrader:
                 })
                 synced += 1
 
-            self.notifier.send_message(f"🔄 Synchronisation terminée. {synced} positions synchronisées depuis Bybit.")
+            self.notifier.send_message(f"🔄 Synchronisation terminée. {synced} positions valides récupérées depuis Bybit.")
         except Exception as e:
             logging.error(f"Erreur sync_with_exchange : {e}")
             self.notifier.send_message("❌ Erreur lors de la synchronisation avec Bybit.")
