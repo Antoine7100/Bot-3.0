@@ -165,6 +165,13 @@ class BotTrader:
 
         self.exchange.create_order(symbol, 'market', side, adjusted_amount)
 
+        # ✅ Notification d'achat
+        self.notifier.send_message(
+            f"📥 Position ouverte sur {symbol} à {price:.4f}\n"
+            f"🎯 TP : {tp:.4f} | 🛑 SL : {sl:.4f}\n"
+            f"💰 Montant : {adjusted_amount:.3f}", '🟢'
+        )
+
     def monitor_positions(self):
         while self.is_running:
             try:
