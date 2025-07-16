@@ -291,68 +291,77 @@ class BotTrader:
                 except Exception as e:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
             time.sleep(12)
+
+    def reste_positions(self):
+        if not self.positions:
+            self.notifier.send_message("📭 Aucune position ouverte pour l'instant.", '📌')
+        else:
+            msg = "📂 *Positions en cours* :\n"
+            for pos in self.positions:
+                msg += (
+                    f"🔹 {pos['symbol']} - {pos['side'].upper()}\n"
+                    f"  🎯 Entrée : {pos['entry']:.4f}\n"
+                    f"  📈 TP : {pos['tp']:.4f} | 🛑 SL : {pos['sl']:.4f}\n"
+                    f"  💰 Montant : {pos['amount']:.3f}\n\n"
+                )
+            self.notifier.send_message(msg, '📍') 
             
     def handle_telegram_command(self, command):
         if command == '/start':
-            self.is_running = True
-            self.notifier.send_message("🤖 Bot démarré.")
+            self.start_bot()
+
         elif command == '/stop':
             self.is_running = False
-            self.notifier.send_message("⏹️ Bot arrêté.")
+            self.notifier.send_message("⛔ Bot arrêté", '🔴')
+
         elif command == '/status':
-            msg = "📊 Statut du bot :\n"
-            msg += f"🔁 En fonctionnement : {'Oui' if self.is_running else 'Non'}\n"
-            msg += f"📈 Positions ouvertes : {len(self.positions)}\n"
-            msg += f"✅ Gains : {self.win_count} | ⛔ Pertes : {self.loss_count}"
-            self.notifier.send_message(msg)
-        elif command == '/positions':
-            if not self.positions:
-                self.notifier.send_message("📌 Aucune position ouverte actuellement.")
-            else:
-                msg = "📌 *Positions en cours* :\n"
-                for pos in self.positions:
-                    msg += f"\n🔷 {pos['symbol']} - {pos['side'].upper()}\n"
-                    msg += f"🎯 Entrée : {pos['entry']}\n"
-                    if pos.get('tp') is not None:
-                        msg += f"📈 TP : {pos['tp']} | "
-                    else:
-                        msg += "📈 TP : - | "
-                    if pos.get('sl') is not None:
-                        msg += f"⛔ SL : {pos['sl']}\n"
-                    else:
-                        msg += "⛔ SL : -\n"
-                    msg += f"💰 Montant : {pos['amount']}\n"
-                self.notifier.send_message(msg)
+            running = "✅ Actif" if self.is_running else "❌ Inactif"
+            infos = f"Statut : {running}\nMontant par trade : {self.trade_amount} USDT\nPositions : {len(self.positions)}"
+            self.notifier.send_message(infos, 'ℹ️')
+
+        elif command == '/menu':
+            self.notifier.send_menu()
+
         elif command == '/sync':
             self.sync_with_exchange()
-            self.notifier.send_message("🔄 Synchronisation avec l'exchange terminée.")
-        elif command == '/close':
+
+        elif command == '/increase':
+            self.trade_amount += 5
+            self.notifier.send_message(f"💵 Nouveau montant : {self.trade_amount} USDT")
+
+        elif command == '/decrease':
+            self.trade_amount = max(5, self.trade_amount - 5)
+            self.notifier.send_message(f"💸 Nouveau montant : {self.trade_amount} USDT")
+
+        elif command == '/closeall':
             for pos in self.positions[:]:
-                opposite = 'sell' if pos['side'] == 'buy' else 'buy'
                 try:
-                    self.exchange.create_order(pos['symbol'], 'market', opposite, pos['amount'])
+                    side = 'sell' if pos['side'] == 'buy' else 'buy'
+                    self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
                     self.positions.remove(pos)
-                    self.notifier.send_message(f"📤 Fermeture manuelle de {pos['symbol']} ({pos['side']})")
+                    self.notifier.send_message(f"🔐 Fermeture forcée de {pos['symbol']}", '⚠️')
                 except Exception as e:
-                    logging.error(f"Erreur lors de la fermeture de {pos['symbol']} : {e}")
+                    logging.error(f"Erreur fermeture forcée {pos['symbol']} : {e}")
+
         elif command == '/stats':
-            self.notifier.send_message(f"📊 Stats : ✅ {self.win_count} | ⛔ {self.loss_count}")
-        elif command == '/menu':
-            keyboard = [
-                [InlineKeyboardButton("▶️ Démarrer", callback_data='/start'),
-                 InlineKeyboardButton("⏹️ Arrêter", callback_data='/stop')],
-                [InlineKeyboardButton("📊 Statut", callback_data='/status')],
-                [InlineKeyboardButton("💵 +5 USDT", callback_data='money+5'),
-                 InlineKeyboardButton("💸 -5 USDT", callback_data='money-5')],
-                [InlineKeyboardButton("📄 Positions", callback_data='/positions'),
-                 InlineKeyboardButton("📈 Stats", callback_data='/stats')],
-                [InlineKeyboardButton("🔄 Sync", callback_data='/sync'),
-                 InlineKeyboardButton("❌ Fermer positions", callback_data='/close')]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            self.notifier.bot.send_message(chat_id=self.notifier.chat_id,
-                                           text="🧠🛠️ Menu de contrôle du bot",
-                                           reply_markup=reply_markup)
+            total = self.win_count + self.loss_count
+            if total > 0:
+                success_rate = (self.win_count / total) * 100
+                msg = (
+                    f"📊 Statistiques du bot :\n"
+                    f"✅ Trades gagnants : {self.win_count}\n"
+                    f"❌ Trades perdants : {self.loss_count}\n"
+                    f"📈 Taux de réussite : {success_rate:.2f}%"
+                )
+            else:
+                msg = "📊 Aucune statistique disponible pour l’instant."
+            self.notifier.send_message(msg, '📊')
+
+        elif command == '/positions':
+            self.reste_positions()
+
+        else:
+            self.notifier.send_message("Commande non reconnue.", '❗')
 bot = BotTrader()
 
 @app.route('/')
