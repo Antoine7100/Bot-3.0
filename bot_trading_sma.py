@@ -100,14 +100,19 @@ class BotTrader:
             self.positions = []
 
             for pos in open_positions:
-                size = float(pos['info'].get('size', 0))
-                entry_price = float(pos['info'].get('entryPrice', 0))
-                if size == 0 or entry_price == 0:
-                    continue  # Ignore les positions sans taille ou sans prix d'entrée
+                info = pos.get('info', {})
+                size = float(info.get('size', 0))
+                entry_price = float(info.get('entryPrice', 0))
 
-                symbol = pos['symbol'].replace("USDT", "/USDT")
-                side = 'buy' if pos['info']['side'].lower() == 'buy' else 'sell'
-                amount = size
+                if size == 0 or entry_price == 0:
+                    continue  # Ignore les positions nulles
+
+                market = self.exchange.market(pos['symbol'])
+                symbol = market['symbol']  # Ex: XRP/USDT
+
+                side = info.get('side', '').lower()
+                if side not in ['buy', 'sell']:
+                    continue
 
                 tp = entry_price * (1 + self.tp_percentage) if side == 'buy' else entry_price * (1 - self.tp_percentage)
                 sl = entry_price * (1 - self.sl_percentage) if side == 'buy' else entry_price * (1 + self.sl_percentage)
@@ -118,14 +123,14 @@ class BotTrader:
                     'entry': entry_price,
                     'tp': tp,
                     'sl': sl,
-                    'amount': amount
+                    'amount': size
                 })
                 synced += 1
 
-            self.notifier.send_message(f"🔄 Synchronisation terminée. {synced} positions valides récupérées depuis Bybit.")
+            self.notifier.send_message(f"🔄 Synchronisation terminée. {synced} positions actives récupérées depuis Bybit.")
         except Exception as e:
-            logging.error(f"Erreur sync_with_exchange : {e}")
-            self.notifier.send_message("❌ Erreur lors de la synchronisation avec Bybit.")
+            logging.error(f"❌ Erreur sync_with_exchange : {e}")
+            self.notifier.send_message("🚫 Erreur lors de la synchronisation avec Bybit.")
 
     def start_bot(self):
         if not self.is_running:
