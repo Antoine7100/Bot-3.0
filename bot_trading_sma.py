@@ -282,6 +282,7 @@ def monitor_positions(self):
                 except Exception as e:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
             time.sleep(12)
+            
     def handle_telegram_command(self, command):
         if command == '/start':
             self.start_bot()
