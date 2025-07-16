@@ -137,36 +137,28 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
 
-def enter_trade(self, signal, symbol, amount):
-    side = 'buy' if signal == 'buy' else 'sell'
-    try:
-        # Création de l'ordre
-        order = self.exchange.create_order(symbol, 'market', side, amount)
-        price = self.exchange.fetch_ticker(symbol)['last']
+    def enter_trade(self, symbol, side, amount, tp, sl):
+        try:
+            order = self.exchange.create_order(symbol, 'market', side, amount)
+            entry_price = self.exchange.fetch_ticker(symbol)['last']
+            position = {
+                'symbol': symbol,
+                'side': side,
+                'amount': amount,
+                'entry': entry_price,
+                'tp': tp,
+                'sl': sl
+            }
+            self.positions.append(position)
 
-        # Calcul SL / TP
-        sl_pct = self.sl_pct / 100
-        tp_pct = self.tp_pct / 100
-        sl = price * (1 - sl_pct) if side == 'buy' else price * (1 + sl_pct)
-        tp = price * (1 + tp_pct) if side == 'buy' else price * (1 - tp_pct)
-
-        # Stockage de la position dans la mémoire du bot
-        position = {
-            'symbol': symbol,
-            'side': side,
-            'amount': amount,
-            'entry': price,
-            'tp': tp,
-            'sl': sl
-        }
-        self.positions.append(position)
-        logging.info(f"Position ajoutée : {position}")
-
-        # Notification Telegram
-        self.notifier.send_message(
-            f"🟢🛒 Nouvelle position {side.upper()} sur {symbol} à {price:.4f}",
-            '🛒'
-        )
+            msg = (
+                f"🟢🛒 Nouvelle position {side.upper()} sur {symbol} à {entry_price:.4f}\n"
+                f"🎯 TP : {tp:.4f} | ⛔ SL : {sl:.4f}\n"
+                f"💰 Montant : {amount:.3f}"
+            )
+            self.notifier.send_message(msg)
+        except Exception as e:
+            logging.error(f"❌ Erreur lors de l’entrée en position sur {symbol} : {e}")
 
     except Exception as e:
         logging.error(f"❌ Erreur lors de l'entrée en position sur {symbol} : {e}")
