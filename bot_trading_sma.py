@@ -175,52 +175,53 @@ class BotTrader:
         while self.is_running:
             try:
                 for pos in self.positions[:]:
-                    last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
+                    try:
+                        last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
 
-                    close = False
-                    msg = ""
+                        if any(x is None for x in [last_price, pos.get('tp'), pos.get('sl'), pos.get('side')]):
+                            logging.warning(f"Position invalide détectée : {pos}")
+                            continue
 
-                    if pos['side'] == 'buy':
-                        if last_price >= pos['tp']:
-                            msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
-                            self.win_count += 1
-                            close = True
-                        elif last_price <= pos['sl']:
-                            msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
-                            self.loss_count += 1
-                            close = True
+                        close = False
+                        msg = ""
 
-                    elif pos['side'] == 'sell':
-                        if last_price <= pos['tp']:
-                            msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
-                            self.win_count += 1
-                            close = True
-                        elif last_price >= pos['sl']:
-                            msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
-                            self.loss_count += 1
-                            close = True
+                        if pos['side'] == 'buy':
+                            if last_price >= pos['tp']:
+                                msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
+                                self.win_count += 1
+                                close = True
+                            elif last_price <= pos['sl']:
+                                msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
+                                self.loss_count += 1
+                                close = True
 
-                    if close:
-                        try:
-                            base_symbol = pos['symbol'].split('/')[0]
-                            balance = self.exchange.fetch_balance()
-                            available = balance[base_symbol]['free']
-                            amount_to_sell = min(pos['amount'], available)
+                        elif pos['side'] == 'sell':
+                            if last_price <= pos['tp']:
+                                msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
+                                self.win_count += 1
+                                close = True
+                            elif last_price >= pos['sl']:
+                                msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
+                                self.loss_count += 1
+                                close = True
 
-                            if amount_to_sell > 0:
-                                opposite = 'sell' if pos['side'] == 'buy' else 'buy'
-                                self.exchange.create_order(pos['symbol'], 'market', opposite, amount_to_sell)
+                        if close:
+                            opposite = 'sell' if pos['side'] == 'buy' else 'buy'
+                            try:
+                                self.exchange.create_order(pos['symbol'], 'market', opposite, pos['amount'])
                                 self.positions.remove(pos)
                                 self.notifier.send_message(msg, '📤')
                                 self.save_stats()
-                            else:
-                                logging.error(f"❌ Pas assez de {base_symbol} pour fermer la position {pos['symbol']}")
+                            except Exception as e:
+                                logging.error(f"Erreur lors de la clôture de {pos['symbol']} : {e}")
 
-                        except Exception as e:
-                            logging.error(f"Erreur lors de la clôture de {pos['symbol']} : {e}")
+                    except Exception as e:
+                        logging.error(f"Erreur sur la position {pos.get('symbol')} : {e}")
+
             except Exception as e:
-                logging.error(f"Erreur monitor_positions : {e}")
-            time.sleep(15)
+                logging.error(f"Erreur dans monitor_positions : {e}")
+
+            time.sleep(15))
 
     def run_bot(self):
         self.is_running = True
