@@ -295,43 +295,57 @@ class BotTrader:
                 )
             self.notifier.send_message(msg, '📍') 
             
-    def handle_telegram_command(self, command):
-        if command == "/start":
-            self.is_running = True
-            self.notifier.send_message("✅ Bot démarré.")
-        elif command == "/stop":
-            self.is_running = False
-            self.notifier.send_message("🛑 Bot arrêté.")
-        elif command == "/status":
-            msg = f"ℹ️ Statut : {'✅ Actif' if self.is_running else '⛔ Inactif'}\nMontant par trade : {self.trade_amount} USDT\nPositions : {len(self.positions)}"
-            self.notifier.send_message(msg)
-        elif command == "/+5":
-            self.trade_amount += 5
-            self.notifier.send_message(f"💰 Nouveau montant par trade : {self.trade_amount} USDT")
-        elif command == "/-5":
-            self.trade_amount = max(5, self.trade_amount - 5)
-            self.notifier.send_message(f"💸 Nouveau montant par trade : {self.trade_amount} USDT")
-        elif command == "/positions":
-            self.send_positions()
-        elif command == "/stats":
-            msg = f"📊 Résultats:\nGagnés ✅ : {self.win_count}\nPerdus ⛔ : {self.loss_count}"
-            self.notifier.send_message(msg)
-        elif command == "/sync":
-            self.sync_with_exchange()
-        elif command == "/close":
-            self.close_all_positions()
-        elif command == "/menu":
-            from telegram import ReplyKeyboardMarkup
-            menu_keyboard = [
-                ['▶️ Démarrer', '⏹️ Arrêter'],
-                ['📊 Statut', '💵 +5 USDT', '💸 -5 USDT'],
-                ['📁 Positions', '📈 Stats'],
-                ['🔄 Sync', '❌ Fermer positions']
-            ]
-            reply_markup = ReplyKeyboardMarkup(menu_keyboard, resize_keyboard=True)
-            self.notifier.send_message("🧠🛠 Menu de contrôle du bot", reply_markup=reply_markup)
-        else:
-            self.notifier.send_message("❗Commande non reconnue.")
+    def handle_telegram_command(self, update):
+        try:
+            message = update.get("message", {})
+            chat_id = message.get("chat", {}).get("id")
+            text = message.get("text", "").strip()
+
+            if not chat_id or not text:
+                return
+
+            logging.info(f"📩 Reçu de Telegram : {update}")
+
+            if text == "/start":
+                self.notifier.send_message("🤖 Bot démarré.")
+            elif text == "/menu":
+                keyboard = ReplyKeyboardMarkup(
+                    keyboard=[
+                        ["▶️ Démarrer", "⏹️ Arrêter"],
+                        ["📊 Statut", "💵 +5 USDT", "💸 -5 USDT"],
+                        ["📂 Positions", "📈 Stats"],
+                        ["🔄 Sync", "❌ Fermer positions"]
+                    ],
+                    resize_keyboard=True
+                )
+                self.bot.send_message(chat_id=chat_id, text="🧠🛠️ Menu de contrôle du bot", reply_markup=keyboard)
+            elif text == "▶️ Démarrer":
+                self.start_bot()
+                self.bot.send_message(chat_id=chat_id, text="✅ Bot Smart Scalper lancé")
+            elif text == "⏹️ Arrêter":
+                self.stop_bot()
+                self.bot.send_message(chat_id=chat_id, text="🛑 Bot arrêté")
+            elif text == "📊 Statut":
+                self.send_status(chat_id)
+            elif text == "💵 +5 USDT":
+                self.trade_amount += 5
+                self.bot.send_message(chat_id=chat_id, text="💰 Montant par trade augmenté de 5 USDT")
+            elif text == "💸 -5 USDT":
+                self.trade_amount = max(5, self.trade_amount - 5)
+                self.bot.send_message(chat_id=chat_id, text="💸 Montant par trade diminué de 5 USDT")
+            elif text == "📂 Positions":
+                self.send_positions(chat_id)
+            elif text == "📈 Stats":
+                self.send_stats(chat_id)
+            elif text == "🔄 Sync":
+                self.sync_with_exchange()
+                self.bot.send_message(chat_id=chat_id, text="💬 🔄 Synchronisation terminée. 0 positions valides récupérées depuis Bybit.")
+            elif text == "❌ Fermer positions":
+                self.close_all_positions(chat_id)
+            else:
+                self.bot.send_message(chat_id=chat_id, text="❗Commande non reconnue.")
+        except Exception as e:
+            logging.error(f"Erreur handle_telegram_command : {e}")
 bot = BotTrader()
 
 @app.route('/')
