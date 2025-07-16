@@ -361,13 +361,14 @@ def status():
 def telegram_webhook():
     data = request.json
     logging.info(f"📩 Reçu de Telegram : {json.dumps(data)}")
+    context = {}  # Ajout du contexte attendu
 
     if 'message' in data and 'text' in data['message']:
         command = data['message']['text']
-        bot.handle_telegram_command(command)
+        bot.handle_telegram_command(command, context)
     elif 'callback_query' in data:
         command = data['callback_query']['data']
-        bot.handle_telegram_command(command)
+        bot.handle_telegram_command(command, context)
 
     return '', 200
 
