@@ -221,8 +221,7 @@ class BotTrader:
             except Exception as e:
                 logging.error(f"Erreur dans monitor_positions : {e}")
 
-            time.sleep(15))
-
+            time.sleep(15)
     def run_bot(self):
         self.is_running = True
 
