@@ -137,39 +137,39 @@ class BotTrader:
         else:
             self.notifier.send_message("⚠️ Le bot est déjà en marche.")
 
-    def enter_trade(self, symbol, side='buy'):
-        if any(p['symbol'] == symbol and p['side'] == side for p in self.positions):
-            if symbol not in self.notifier.silent_notifications:
-                self.notifier.send_message(f"⚠️ ❌ Trade déjà ouvert pour {symbol} ({side})")
-                self.notifier.silent_notifications.add(symbol)
-            return
+def enter_trade(self, signal, symbol, amount):
+    side = 'buy' if signal == 'buy' else 'sell'
+    try:
+        # Création de l'ordre
+        order = self.exchange.create_order(symbol, 'market', side, amount)
+        price = self.exchange.fetch_ticker(symbol)['last']
 
-        try:
-            price = self.exchange.fetch_ticker(symbol)['last']
-            adjusted_amount = max(5 / price, self.trade_amount)
-            order_value = price * adjusted_amount
+        # Calcul SL / TP
+        sl_pct = self.sl_pct / 100
+        tp_pct = self.tp_pct / 100
+        sl = price * (1 - sl_pct) if side == 'buy' else price * (1 + sl_pct)
+        tp = price * (1 + tp_pct) if side == 'buy' else price * (1 - tp_pct)
 
-            if order_value < 5:
-                return
+        # Stockage de la position dans la mémoire du bot
+        position = {
+            'symbol': symbol,
+            'side': side,
+            'amount': amount,
+            'entry': price,
+            'tp': tp,
+            'sl': sl
+        }
+        self.positions.append(position)
+        logging.info(f"Position ajoutée : {position}")
 
-            self.exchange.create_order(symbol, 'market', side, adjusted_amount)
+        # Notification Telegram
+        self.notifier.send_message(
+            f"🟢🛒 Nouvelle position {side.upper()} sur {symbol} à {price:.4f}",
+            '🛒'
+        )
 
-            tp = price * (1 + self.tp_percentage) if side == 'buy' else price * (1 - self.tp_percentage)
-            sl = price * (1 - self.sl_percentage) if side == 'buy' else price * (1 + self.sl_percentage)
-
-            self.positions.append({
-                'symbol': symbol,
-                'side': side,
-                'entry': price,
-                'tp': tp,
-                'sl': sl,
-                'amount': adjusted_amount
-            })
-
-            self.notifier.send_message(f"🛒 Nouvelle position {side.upper()} sur {symbol} à {price:.4f}", '🟢')
-
-        except Exception as e:
-            logging.error(f"Erreur lors de l'entrée en position pour {symbol} : {e}")
+    except Exception as e:
+        logging.error(f"❌ Erreur lors de l'entrée en position sur {symbol} : {e}")
             
     def monitor_positions(self):
         while self.is_running:
