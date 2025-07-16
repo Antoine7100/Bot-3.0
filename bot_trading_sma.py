@@ -299,61 +299,63 @@ class BotTrader:
             self.notifier.send_message(msg, '📍') 
             
     def handle_telegram_command(self, command):
-        if command == '/start':
-            self.start_bot()
-
-        elif command == '/stop':
+        if command == "/start":
+            self.is_running = True
+            self.notifier.send_message("▶️ Le bot a démarré.")
+        elif command == "/stop":
             self.is_running = False
-            self.notifier.send_message("⛔ Bot arrêté", '🔴')
-
-        elif command == '/status':
-            running = "✅ Actif" if self.is_running else "❌ Inactif"
-            infos = f"Statut : {running}\nMontant par trade : {self.trade_amount} USDT\nPositions : {len(self.positions)}"
-            self.notifier.send_message(infos, 'ℹ️')
-
-        elif command == '/menu':
-            self.notifier.send_menu()
-
-        elif command == '/sync':
-            self.sync_with_exchange()
-
-        elif command == '/increase':
-            self.trade_amount += 5
-            self.notifier.send_message(f"💵 Nouveau montant : {self.trade_amount} USDT")
-
-        elif command == '/decrease':
-            self.trade_amount = max(5, self.trade_amount - 5)
-            self.notifier.send_message(f"💸 Nouveau montant : {self.trade_amount} USDT")
-
-        elif command == '/closeall':
-            for pos in self.positions[:]:
-                try:
-                    side = 'sell' if pos['side'] == 'buy' else 'buy'
-                    self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
-                    self.positions.remove(pos)
-                    self.notifier.send_message(f"🔐 Fermeture forcée de {pos['symbol']}", '⚠️')
-                except Exception as e:
-                    logging.error(f"Erreur fermeture forcée {pos['symbol']} : {e}")
-
-        elif command == '/stats':
-            total = self.win_count + self.loss_count
-            if total > 0:
-                success_rate = (self.win_count / total) * 100
-                msg = (
-                    f"📊 Statistiques du bot :\n"
-                    f"✅ Trades gagnants : {self.win_count}\n"
-                    f"❌ Trades perdants : {self.loss_count}\n"
-                    f"📈 Taux de réussite : {success_rate:.2f}%"
-                )
+            self.notifier.send_message("⏹️ Le bot est arrêté.")
+        elif command == "/menu":
+            keyboard = [
+                ["▶️ Démarrer", "⏹️ Arrêter"],
+                ["📊 Statut", "💵 +5 USDT", "💸 -5 USDT"],
+                ["📂 Positions", "📈 Stats"],
+                ["🔄 Sync", "❌ Fermer positions"]
+            ]
+            self.notifier.send_message("🧠🛠️ Menu de contrôle du bot", keyboard)
+        elif command == "📂 Positions":
+            if not self.positions:
+                self.notifier.send_message("📌📭 Aucune position ouverte pour l'instant")
             else:
-                msg = "📊 Aucune statistique disponible pour l’instant."
-            self.notifier.send_message(msg, '📊')
-
-        elif command == '/positions':
-            self.reste_positions()
-
+                msg = "📌📂 *Positions en cours* :\n"
+                for pos in self.positions:
+                    msg += (
+                        f"\n🔷 {pos['symbol']} - {pos['side'].upper()}\n"
+                        f"🎯 Entrée : {pos['entry']:.4f}\n"
+                        f"📈 TP : {pos['tp']:.4f} | ⛔ SL : {pos['sl']:.4f}\n"
+                        f"💰 Montant : {pos['amount']:.3f}\n"
+                    )
+                self.notifier.send_message(msg)
+        elif command == "📈 Stats":
+            total = self.win_count + self.loss_count
+            winrate = (self.win_count / total) * 100 if total > 0 else 0
+            msg = (
+                f"📈 *Stats* :\n"
+                f"✅ Gains : {self.win_count}\n"
+                f"❌ Pertes : {self.loss_count}\n"
+                f"📊 Winrate : {winrate:.2f}%"
+            )
+            self.notifier.send_message(msg)
+        elif command == "💵 +5 USDT":
+            self.amount_per_trade += 5
+            self.notifier.send_message(f"💰 Nouveau montant par trade : {self.amount_per_trade} USDT")
+        elif command == "💸 -5 USDT":
+            self.amount_per_trade = max(5, self.amount_per_trade - 5)
+            self.notifier.send_message(f"💰 Nouveau montant par trade : {self.amount_per_trade} USDT")
+        elif command == "📊 Statut":
+            status = "✅ Actif" if self.is_running else "⛔ Inactif"
+            msg = (
+                f"ℹ️ Statut : {status}\n"
+                f"Montant par trade : {self.amount_per_trade} USDT\n"
+                f"Positions : {len(self.positions)}"
+            )
+            self.notifier.send_message(msg)
+        elif command == "🔄 Sync":
+            self.sync_with_exchange()
+        elif command == "❌ Fermer positions":
+            self.close_all_positions()
         else:
-            self.notifier.send_message("Commande non reconnue.", '❗')
+            self.notifier.send_message("❗Commande non reconnue.")
 bot = BotTrader()
 
 @app.route('/')
