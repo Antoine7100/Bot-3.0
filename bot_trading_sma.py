@@ -295,80 +295,89 @@ class BotTrader:
                 )
             self.notifier.send_message(msg, '📍') 
             
-    def handle_telegram_command(self, update, context):
-        try:
-            command = update.message.text.lower()
+    def handle_telegram_command(self, command):
+        if command == '/start':
+            self.start_bot()
 
-            if command == "/menu":
-                menu_keyboard = ReplyKeyboardMarkup(
-                    keyboard=[
-                        ["▶️ Démarrer", "⏹️ Arrêter"],
-                        ["📊 Statut", "💵 +5 USDT", "💸 -5 USDT"],
-                        ["📁 Positions", "📈 Stats"],
-                        ["🔄 Sync", "❌ Fermer positions"]
-                    ],
-                    resize_keyboard=True
+        elif command == '/stop':
+            self.is_running = False
+            self.notifier.send_message("⛔ Bot arrêté", '🔴')
+
+        elif command == '/status':
+            running = "✅ Actif" if self.is_running else "❌ Inactif"
+            infos = f"Statut : {running}\nMontant par trade : {self.trade_amount} USDT\nPositions : {len(self.positions)}"
+            self.notifier.send_message(infos, 'ℹ️')
+
+        elif command == '/menu':
+            self.notifier.send_menu()
+
+        elif command == '/sync':
+            self.sync_with_exchange()
+
+        elif command == '/increase':
+            self.trade_amount += 5
+            self.notifier.send_message(f"💵 Nouveau montant : {self.trade_amount} USDT")
+
+        elif command == '/decrease':
+            self.trade_amount = max(5, self.trade_amount - 5)
+            self.notifier.send_message(f"💸 Nouveau montant : {self.trade_amount} USDT")
+
+        elif command == '/closeall':
+            for pos in self.positions[:]:
+                try:
+                    side = 'sell' if pos['side'] == 'buy' else 'buy'
+                    self.exchange.create_order(pos['symbol'], 'market', side, pos['amount'])
+                    self.positions.remove(pos)
+                    self.notifier.send_message(f"🔐 Fermeture forcée de {pos['symbol']}", '⚠️')
+                except Exception as e:
+                    logging.error(f"Erreur fermeture forcée {pos['symbol']} : {e}")
+
+        elif command == '/stats':
+            total = self.win_count + self.loss_count
+            if total > 0:
+                success_rate = (self.win_count / total) * 100
+                msg = (
+                    f"📊 Statistiques du bot :\n"
+                    f"✅ Trades gagnants : {self.win_count}\n"
+                    f"❌ Trades perdants : {self.loss_count}\n"
+                    f"📈 Taux de réussite : {success_rate:.2f}%"
                 )
-                context.bot.send_message(chat_id=update.effective_chat.id, text="🧠🛠️ Menu de contrôle du bot", reply_markup=menu_keyboard)
-
-            elif command == "▶️ démarrer":
-                self.is_running = True
-                context.bot.send_message(chat_id=update.effective_chat.id, text="✅ Bot démarré")
-
-            elif command == "⏹️ arrêter":
-                self.is_running = False
-                context.bot.send_message(chat_id=update.effective_chat.id, text="🛑 Bot arrêté")
-
-            elif command == "📊 statut":
-                msg = f"📊 Statut : {'✅ Actif' if self.is_running else '🛑 Inactif'}\nMontant par trade : {self.trade_amount:.0f} USDT\nPositions : {len(self.positions)}"
-                context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
-
-            elif command == "💵 +5 usdt":
-                self.trade_amount += 5
-                context.bot.send_message(chat_id=update.effective_chat.id, text=f"➕ Nouveau montant : {self.trade_amount:.0f} USDT")
-
-            elif command == "💸 -5 usdt":
-                self.trade_amount = max(5, self.trade_amount - 5)
-                context.bot.send_message(chat_id=update.effective_chat.id, text=f"➖ Nouveau montant : {self.trade_amount:.0f} USDT")
-
-            elif command == "📁 positions":
-                self.send_positions(update.effective_chat.id)
-
-            elif command == "📈 stats":
-                self.send_stats(update.effective_chat.id)
-
-            elif command == "🔄 sync":
-                self.sync_with_exchange()
-                context.bot.send_message(chat_id=update.effective_chat.id, text="💬🔄 Synchronisation terminée.")
-
-            elif command == "❌ fermer positions":
-                self.close_all_positions()
-                context.bot.send_message(chat_id=update.effective_chat.id, text="🔴 Toutes les positions ont été fermées.")
-
             else:
-                context.bot.send_message(chat_id=update.effective_chat.id, text="❗Commande non reconnue.")
+                msg = "📊 Aucune statistique disponible pour l’instant."
+            self.notifier.send_message(msg, '📊')
 
-        except Exception as e:
-            logging.error(f"❌ Erreur handle_telegram_command : {e}")
+        elif command == '/positions':
+            if not self.positions:
+                self.notifier.send_message("📭 Aucune position ouverte pour l'instant.", '📌')
+            else:
+                msg = "📂 *Positions en cours* :\n"
+                for pos in self.positions:
+                    msg += (
+                        f"🔹 {pos['symbol']} - {pos['side'].upper()}\n"
+                        f"  🎯 Entrée : {pos['entry']:.4f}\n"
+                        f"  📈 TP : {pos['tp']:.4f} | 🛑 SL : {pos['sl']:.4f}\n"
+                        f"  💰 Montant : {pos['amount']:.3f}\n\n"
+                    )
+                self.notifier.send_message(msg, '📍')
+
+        else:
+            self.notifier.send_message("Commande non reconnue.", '❗')
 bot = BotTrader()
-
-@app.route('/')
-def status():
-    logging.info("📱 Ping reçu (UptimeRobot)")
-    return "Bot de trading opérationnel"
 
 @app.route('/telegram', methods=['POST'])
 def telegram_webhook():
     data = request.json
     logging.info(f"📩 Reçu de Telegram : {json.dumps(data)}")
-    context = {}  # Ajout du contexte attendu
 
-    if 'message' in data and 'text' in data['message']:
-        command = data['message']['text']
-        bot.handle_telegram_command(command, context)
-    elif 'callback_query' in data:
-        command = data['callback_query']['data']
-        bot.handle_telegram_command(command, context)
+    try:
+        if 'message' in data and 'text' in data['message']:
+            command = data['message']['text']
+            bot.handle_telegram_command(command)
+        elif 'callback_query' in data:
+            command = data['callback_query']['data']
+            bot.handle_telegram_command(command)
+    except Exception as e:
+        logging.error(f"❌ Erreur dans telegram_webhook : {e}")
 
     return '', 200
 
