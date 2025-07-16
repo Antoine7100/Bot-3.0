@@ -159,9 +159,6 @@ class BotTrader:
             self.notifier.send_message(msg)
         except Exception as e:
             logging.error(f"❌ Erreur lors de l’entrée en position sur {symbol} : {e}")
-
-    except Exception as e:
-        logging.error(f"❌ Erreur lors de l'entrée en position sur {symbol} : {e}")
             
     def monitor_positions(self):
         while self.is_running:
