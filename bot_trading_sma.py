@@ -176,10 +176,10 @@ class BotTrader:
             try:
                 for pos in self.positions[:]:
                     try:
-                        last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
-
-                        if any(x is None for x in [last_price, pos.get('tp'), pos.get('sl'), pos.get('side')]):
-                            logging.warning(f"Position invalide détectée : {pos}")
+                        ticker = self.exchange.fetch_ticker(pos['symbol'])
+                        last_price = ticker.get('last')
+                        if last_price is None:
+                            logging.warning(f"[MONITOR] ⚠️ Prix introuvable pour {pos['symbol']}")
                             continue
 
                         close = False
@@ -211,16 +211,16 @@ class BotTrader:
                                 self.exchange.create_order(pos['symbol'], 'market', opposite, pos['amount'])
                                 self.positions.remove(pos)
                                 self.notifier.send_message(msg, '📤')
+                                logging.info(f"[MONITOR] ✅ Position clôturée : {pos['symbol']}")
                                 self.save_stats()
                             except Exception as e:
-                                logging.error(f"Erreur lors de la clôture de {pos['symbol']} : {e}")
+                                logging.error(f"[MONITOR] ❌ Erreur lors de la clôture : {e}")
+                                self.notifier.send_message(f"⚠️ Erreur de clôture sur {pos['symbol']}\n{e}", '❗')
 
                     except Exception as e:
-                        logging.error(f"Erreur sur la position {pos.get('symbol')} : {e}")
-
+                        logging.error(f"[MONITOR] ❌ Erreur sur une position : {e}")
             except Exception as e:
-                logging.error(f"Erreur dans monitor_positions : {e}")
-
+                logging.error(f"[MONITOR] ❌ Erreur générale de la boucle : {e}")
             time.sleep(15)
             
     def run_bot(self):
