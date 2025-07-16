@@ -172,47 +172,51 @@ class BotTrader:
             logging.error(f"Erreur lors de l'entrée en position pour {symbol} : {e}")
             
 
-    def monitor_positions(self):
-        while self.is_running:
-            try:
-                for pos in self.positions[:]:
-                    last_price = self.exchange.fetch_ticker(pos['symbol'])['last']
+def monitor_positions(self):
+    while self.is_running:
+        try:
+            for pos in self.positions[:]:
+                ticker = self.exchange.fetch_ticker(pos['symbol'])
+                last_price = ticker['last']
 
-                    close = False
-                    msg = ""
+                logging.info(f"🔍 Vérif {pos['symbol']} {pos['side']} : last={last_price}, TP={pos['tp']}, SL={pos['sl']}")
 
-                    if pos['side'] == 'buy':
-                        if last_price >= pos['tp']:
-                            msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
-                            self.win_count += 1
-                            close = True
-                        elif last_price <= pos['sl']:
-                            msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
-                            self.loss_count += 1
-                            close = True
+                close = False
+                msg = ""
 
-                    elif pos['side'] == 'sell':
-                        if last_price <= pos['tp']:
-                            msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
-                            self.win_count += 1
-                            close = True
-                        elif last_price >= pos['sl']:
-                            msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
-                            self.loss_count += 1
-                            close = True
+                if pos['side'] == 'buy':
+                    if last_price >= pos['tp']:
+                        msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
+                        self.win_count += 1
+                        close = True
+                    elif last_price <= pos['sl']:
+                        msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
+                        self.loss_count += 1
+                        close = True
 
-                    if close:
+                elif pos['side'] == 'sell':
+                    if last_price <= pos['tp']:
+                        msg = f"✅ TP atteint pour {pos['symbol']} à {last_price:.4f}"
+                        self.win_count += 1
+                        close = True
+                    elif last_price >= pos['sl']:
+                        msg = f"⛔ SL atteint pour {pos['symbol']} à {last_price:.4f}"
+                        self.loss_count += 1
+                        close = True
+
+                if close:
+                    try:
                         opposite = 'sell' if pos['side'] == 'buy' else 'buy'
-                        try:
-                            self.exchange.create_order(pos['symbol'], 'market', opposite, pos['amount'])
-                            self.positions.remove(pos)
-                            self.notifier.send_message(msg, '📤')
-                            self.save_stats()
-                        except Exception as e:
-                            logging.error(f"Erreur lors de la clôture de {pos['symbol']} : {e}")
-            except Exception as e:
-                logging.error(f"Erreur monitor_positions : {e}")
-            time.sleep(15)
+                        logging.info(f"📤 Fermeture position {pos['symbol']} en {opposite} qty={pos['amount']}")
+                        self.exchange.create_order(pos['symbol'], 'market', opposite, pos['amount'])
+                        self.positions.remove(pos)
+                        self.notifier.send_message(msg, '📤')
+                        self.save_stats()
+                    except Exception as e:
+                        logging.error(f"❌ Erreur de fermeture {pos['symbol']}: {e}")
+        except Exception as e:
+            logging.error(f"❗ Erreur dans monitor_positions : {e}")
+        time.sleep(15)
 
     def run_bot(self):
         self.is_running = True
