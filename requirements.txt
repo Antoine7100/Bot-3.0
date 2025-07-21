@@ -5,3 +5,4 @@ Flask
 gunicorn
 python-telegram-bot==20.3
 requests
+aiohttp>=3.12.14 # not directly required, pinned by Snyk to avoid a vulnerability
