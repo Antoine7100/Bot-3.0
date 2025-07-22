@@ -264,6 +264,10 @@ class BotTrader:
                     bullish_5m = df5['ema5'].iloc[-1] > df5['ema20'].iloc[-1]
                     bearish_5m = df5['ema5'].iloc[-1] < df5['ema20'].iloc[-1]
 
+                    amount = self.trade_amount
+                    tp = 0.5  # ou autre valeur en %
+                    sl = 0.25  # ou autre valeur en %
+
                     if (price > high_break and
                         ema5 > ema20 and
                         rsi > 55 and
@@ -271,7 +275,7 @@ class BotTrader:
                         ha_color == "green" and
                         bullish_5m and
                         volume > 100):
-                        self.enter_trade(symbol, 'buy')
+                        self.enter_trade(symbol, amount, tp, sl, 'buy')
 
                     elif (price < low_break and
                           ema5 < ema20 and
@@ -280,7 +284,7 @@ class BotTrader:
                           ha_color == "red" and
                           bearish_5m and
                           volume > 100):
-                        self.enter_trade(symbol, 'sell')
+                        self.enter_trade(symbol, amount, tp, sl, 'sell')
 
                 except Exception as e:
                     logging.error(f"Erreur run_bot pour {symbol} : {e}")
